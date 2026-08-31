@@ -52,6 +52,8 @@ if (fs.existsSync(lectureAudio)) {
   check('Reel has hook title', typeof r0.title === 'string' && r0.title.length > 0);
   check('Reel has video and captions URLs', typeof r0.video === 'string' && typeof r0.captions === 'string');
   check('Reel has takeaways array', Array.isArray(r0.takeaways) && r0.takeaways.length > 0);
+  check('Reel has AI description', typeof r0.description === 'string' && r0.description.length > 0);
+  check('Reel has hashtags', Array.isArray(r0.hashtags) && r0.hashtags.length > 0);
   check('SRT caption file exists on disk', fs.existsSync(path.join(__dirname, '..', 'data', r0.captions.replace(/^\//, ''))));
 }
 
@@ -80,6 +82,18 @@ if (up) {
   const singleData = await singleRes.json();
   check('GET /api/reels?source=... returns manifest', singleRes.status === 200 && singleData.source === 'lecture.mp3');
   check('Manifest contains structured takeaways', Array.isArray(singleData.reels?.[0]?.takeaways));
+
+  // POST /api/ask — question about video content should map back to a reel
+  const askRes = await fetch(`http://localhost:${PORT}/api/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: 'What is binary search?' }),
+  });
+  const askData = await askRes.json();
+  check('POST /api/ask returns grounded answer', askRes.status === 200 && askData.ok === true && askData.sources.length > 0);
+  check('Ask response maps video answer to a reel deep link',
+    askData.reel === undefined || (typeof askData.reel.deepLink === 'string' && askData.reel.deepLink.includes('/reels.html?source=')),
+    askData.reel ? askData.reel.title : 'no video hit');
 
   // Verify static /reels and /reels.html
   const reelsHtmlRes = await fetch(`http://localhost:${PORT}/reels.html`);

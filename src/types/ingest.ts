@@ -126,6 +126,20 @@ export interface AskResponse {
   model: string;
   answer: string;
   sources: RagSource[];
+  /**
+   * Present when the question maps into an uploaded VIDEO: the rendered reel
+   * that explains exactly this portion, with a deep link into the Reels feed.
+   */
+  reel?: {
+    source: string;
+    reelId: string;
+    title: string;
+    start: number;
+    end: number;
+    video: string;
+    /** /reels.html?source=...&reel=... — opens the feed on this exact clip */
+    deepLink: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -276,6 +290,10 @@ export interface ReelInfo {
   takeaways: string[];
   /** 1-sentence summary */
   summary?: string;
+  /** AI-written social description (explanation + context), shown as the reel's description */
+  description?: string;
+  /** AI-chosen hashtags for discoverability */
+  hashtags?: string[];
   /** Per-clip rendering status */
   status: 'ready' | 'processing' | 'pending' | 'failed';
   error?: string;

@@ -199,6 +199,11 @@
     <div id="answerBox" class="hidden" style="margin-top:16px">
       <div style="font-size:13px; color:var(--muted); margin-bottom:8px" id="answerMeta"></div>
       <div class="chunk"><div class="body"><pre id="answerText"></pre></div></div>
+      <div id="answerReel" class="hidden" style="margin-top:14px; padding:12px 14px; border:1px solid rgba(99,102,241,0.35); border-radius:12px; background:rgba(99,102,241,0.08); display:flex; flex-wrap:wrap; gap:10px; align-items:center;">
+        <span id="answerReelLabel" style="font-size:13px; font-weight:700; flex:1; min-width:200px;"></span>
+        <a id="answerReelLink" class="nav-pill active" style="text-decoration:none; cursor:pointer;">▶ Watch the reel</a>
+        <button id="askForYouBtn" style="background:linear-gradient(135deg,#ec4899,#be185d); color:#fff; border:none; padding:8px 14px; border-radius:99px; font-weight:800; font-size:12.5px; cursor:pointer;">✨ Push a For You reel about this</button>
+      </div>
       <h2 style="margin-top:16px">📚 Sources</h2>
       <div id="sourceList"></div>
     </div>
@@ -520,6 +525,41 @@ async function doAsk() {
       (data.grounded ? '✅ Grounded LLM answer' : '⚠️ Retrieval-only (no LLM key)') +
       ' · model: ' + data.model + ' · ' + data.sources.length + ' source(s)';
     answerText.textContent = data.answer;
+
+    // Contextual reel reference: the rendered clip that explains exactly this part
+    const answerReel = document.getElementById('answerReel');
+    const answerReelLabel = document.getElementById('answerReelLabel');
+    const answerReelLink = document.getElementById('answerReelLink');
+    const askForYouBtn = document.getElementById('askForYouBtn');
+    if (answerReel && answerReelLabel && answerReelLink && askForYouBtn) {
+      if (data.reel) {
+        const r = data.reel;
+        answerReelLabel.textContent = '🎬 "' + (r.title || 'Reel') + '" · ' + fmtTime(r.start) + '–' + fmtTime(r.end) + ' · from your library: ' + r.source;
+        answerReelLink.href = r.deepLink;
+        answerReelLink.target = '_blank';
+        askForYouBtn.onclick = async () => {
+          askForYouBtn.disabled = true;
+          askForYouBtn.textContent = '⏳ Queuing…';
+          try {
+            const pres = await fetch(base + '/api/reels/personalize', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ source: r.source, interests: [q] }),
+            });
+            const pdata = await pres.json();
+            askForYouBtn.textContent = pdata.ok
+              ? '✨ Pushed to your feed (' + pdata.sectionsUsed + ' topics · ' + Math.round(pdata.totalSec) + 's)'
+              : '❌ Failed';
+          } catch {
+            askForYouBtn.textContent = '❌ Failed';
+          }
+        };
+        answerReel.classList.remove('hidden');
+      } else {
+        answerReel.classList.add('hidden');
+      }
+    }
+
     sourceList.innerHTML = '';
     data.sources.forEach((s, i) => {
       const loc = [s.source, s.page != null ? ('page ' + s.page) : null,

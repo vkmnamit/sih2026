@@ -89,6 +89,7 @@
   let selectedUploadFile = null;
   let knownReelIds = new Set();
   let feedSource = '';
+  let deepLinkReelId = new URLSearchParams(window.location.search).get('reel') || '';
   const selectedInterests = new Set();
 
   /** Personalized "For You" reels first, then chronological order. */
@@ -310,6 +311,12 @@
         renderChapters();
         renderFeed();
         loadReel(currentIndex < reelList.length ? currentIndex : 0);
+        // Deep link support: /reels.html?source=...&reel=<reelId>
+        if (deepLinkReelId) {
+          const idx = reelList.findIndex((r) => r.id === deepLinkReelId);
+          if (idx >= 0) loadReel(idx);
+          deepLinkReelId = '';
+        }
       } else {
         renderEmptyState(source, data.videoAvailable);
       }
@@ -463,6 +470,9 @@
       const topicsBadge = (reel.segments && reel.segments.length > 1)
         ? `<span class="feed-badge">${reel.segments.length} topics</span>`
         : '';
+      const tagLine = (reel.hashtags && reel.hashtags.length > 0)
+        ? `<div class="feed-time" style="color:#f9a8d4;">${escapeHtml(reel.hashtags.slice(0, 3).join(' '))}</div>`
+        : '';
       card.innerHTML = `
         <div class="feed-num">${isForyou ? '✨' : idx + 1}</div>
         <div class="feed-body">
@@ -474,6 +484,7 @@
           </div>
           ${takeaway ? `<div class="feed-takeaway">💡 ${escapeHtml(takeaway)}</div>` : ''}
           <div class="feed-time">⏱️ ${formatTime(start)} – ${formatTime(end)}</div>
+          ${tagLine}
         </div>
       `;
       card.addEventListener('click', () => {
@@ -811,7 +822,14 @@
     const dur = reel.duration ?? reel.durationSec ?? Math.round(end - start);
 
     if (reel.takeaways && reel.takeaways.length > 0) {
-      modalSummaryText.innerHTML = `<ul style="margin:0; padding-left:18px; line-height:1.7;">${reel.takeaways.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
+      const descHtml = reel.description
+        ? `<div style="white-space:pre-line; color:#cbd5e1; font-size:13.5px; line-height:1.6; margin-bottom:12px;">${escapeHtml(reel.description)}</div>`
+        : '';
+      const tagHtml = (reel.hashtags && reel.hashtags.length > 0)
+        ? `<div style="margin-bottom:12px;">${reel.hashtags.map((h) => `<span style="display:inline-block; margin:2px 4px 2px 0; padding:3px 10px; border-radius:99px; background:rgba(236,72,153,0.15); color:#f9a8d4; font-size:11.5px; font-weight:700;">${escapeHtml(h)}</span>`).join('')}</div>`
+        : '';
+      const takeHtml = `<ul style="margin:0; padding-left:18px; line-height:1.7;">${reel.takeaways.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
+      modalSummaryText.innerHTML = descHtml + tagHtml + takeHtml;
     } else {
       modalSummaryText.textContent = reel.summary || reel.transcript || 'No summary available.';
     }

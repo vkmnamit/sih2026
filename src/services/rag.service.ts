@@ -14,6 +14,7 @@ import { config } from '../config/index.js';
 import { embedText, embedTexts } from './embedding.service.js';
 import { addChunks, search } from './vector-store.service.js';
 import { chatComplete, hasLlmKey } from './llm.service.js';
+import { findReelForTimestamp } from './reel.service.js';
 import type { AskResponse, Chunk, RagSource } from '../types/ingest.js';
 
 const SYSTEM_PROMPT = [
@@ -73,6 +74,12 @@ export async function ask(
     snippet: doc.text.slice(0, 240) + (doc.text.length > 240 ? '…' : ''),
   }));
 
+  // If the best-matching chunk comes from an uploaded VIDEO, link the answer
+  // to the rendered reel that explains exactly this portion (contextual cut,
+  // never a random one — sections come from the LLM topic pipeline).
+  const videoHit = hits.find(({ doc }) => typeof doc.meta.startSec === 'number');
+  const reel = (videoHit ? findReelForTimestamp(videoHit.doc.source, videoHit.doc.meta.startSec as number) : null) ?? undefined;
+
   if (hits.length === 0) {
     return {
       ok: true,
@@ -102,7 +109,7 @@ export async function ask(
           content: `Study material retrieved from the student's uploaded content:\n\n${context}\n\n---\n\nStudent question: ${trimmed}`,
         },
       ]);
-      return { ok: true, question: trimmed, grounded: true, model: config.openRouterModel, answer, sources };
+      return { ok: true, question: trimmed, grounded: true, model: config.openRouterModel, answer, sources, reel };
     } catch (err) {
       // LLM failure must not lose the retrieval results — fall through
       lastLlmError = (err as Error).message;
@@ -123,5 +130,5 @@ export async function ask(
         ...hits.map(({ doc }, i) => `▪ ${citeSource(sources[i])}\n${doc.text}`),
       ].join('\n');
 
-  return { ok: true, question: trimmed, grounded: false, model: 'retrieval-only', answer, sources };
+  return { ok: true, question: trimmed, grounded: false, model: 'retrieval-only', answer, sources, reel };
 }

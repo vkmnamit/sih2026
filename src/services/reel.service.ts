@@ -611,18 +611,36 @@ async function ragContextForSection(
  * @param index       - section index (for fallback titles)
  * @param llmTitle    - pre-chosen topic title from Stage 1 LLM (skip title re-generation)
  */
+/** Derive deterministic hashtags from a section's title + transcript. */
+function fallbackHashtags(text: string, title: string): string[] {
+  const stop = new Set(['the', 'and', 'for', 'you', 'this', 'that', 'with', 'from', 'have', 'are', 'was', 'were', 'will', 'your', 'what', 'when', 'how', 'why', 'who', 'its', "it's", 'into', 'about', 'their', 'them', 'they', 'been', 'being', 'over', 'just', 'like', 'some', 'more', 'very', 'also', 'can', 'get', 'not', 'but', 'all', 'one', 'out', 'our']);
+  const words = `${title} ${text}`
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 4 && !stop.has(w) && !/^\d+$/.test(w));
+  const counts = new Map<string, number>();
+  for (const w of words) counts.set(w, (counts.get(w) ?? 0) + 1);
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([w]) => `#${w.charAt(0).toUpperCase() + w.slice(1)}`);
+}
+
 async function generateReelMeta(
   sectionText: string,
   source: string,
   index: number,
   llmTitle?: string,
-): Promise<{ title: string; takeaways: string[]; summary: string }> {
+): Promise<{ title: string; takeaways: string[]; summary: string; description: string; hashtags: string[] }> {
   const fbTitle = llmTitle?.trim() || fallbackTitle(sectionText, index);
   const fbTakeaways = fallbackTakeaways(sectionText);
+  const fbHashtags = fallbackHashtags(sectionText, fbTitle);
+  const fbDescription = `${fbTitle}\n\n${fbTakeaways[0] ?? ''}\n\n📚 From your library: ${source}`.trim();
   const cleanText = sectionText.replace(/\s+/g, ' ').trim();
 
   if (!cleanText) {
-    return { title: fbTitle, takeaways: fbTakeaways, summary: 'Key video segment highlight.' };
+    return { title: fbTitle, takeaways: fbTakeaways, summary: 'Key video segment highlight.', description: fbDescription, hashtags: fbHashtags };
   }
 
   // RAG: retrieve related passages from the same lecture
@@ -637,34 +655,44 @@ async function generateReelMeta(
         {
           role: 'system',
           content:
-            'You are an AI educational video editor. Given a transcript excerpt and optional related context, ' +
-            'generate 2–3 concise bullet takeaways that a student should remember, and a 1-sentence summary. ' +
+            'You are an AI educational video editor. Given a transcript excerpt and optional related context, generate:\n' +
+            '1. "takeaways": 2–3 concise bullets a student should remember\n' +
+            '2. "summary": a 1-sentence summary\n' +
+            '3. "description": a short social-media style caption (2–3 sentences) that EXPLAINS the concept and references that this clip comes from the student\'s uploaded lecture\n' +
+            '4. "hashtags": the 5–8 BEST hashtags for discoverability (topic names, subject, exam-relevant tags), each starting with #\n' +
             'The title is already decided — DO NOT generate a title.\n' +
             'Respond with ONLY JSON in this exact shape (no markdown, no extra text):\n' +
-            '{"takeaways": ["...", "..."], "summary": "..."}',
+            '{"takeaways": ["..."], "summary": "...", "description": "...", "hashtags": ["#BinarySearch", "#DSA"]}',
         },
         {
           role: 'user',
           content: `Source: ${source}\nSection: ${fbTitle}\n\nTranscript:\n${cleanText.slice(0, 1000)}${contextBlock}`,
         },
       ],
-      { temperature: 0.3, maxTokens: 300 }
+      { temperature: 0.3, maxTokens: 500 }
     );
 
     const match = raw.match(/\{[\s\S]*\}/);
     if (match) {
-      const parsed = JSON.parse(match[0]) as { takeaways?: string[]; summary?: string };
+      const parsed = JSON.parse(match[0]) as {
+        takeaways?: string[]; summary?: string; description?: string; hashtags?: string[];
+      };
+      const hashtags = Array.isArray(parsed.hashtags) && parsed.hashtags.length > 0
+        ? parsed.hashtags.map((h) => String(h).trim()).filter((h) => h.startsWith('#')).slice(0, 8)
+        : fbHashtags;
       return {
         title: fbTitle,
         takeaways: Array.isArray(parsed.takeaways) && parsed.takeaways.length > 0
           ? parsed.takeaways.map((t) => String(t).trim()).filter(Boolean).slice(0, 4)
           : fbTakeaways,
         summary: (parsed.summary || '').trim() || fbTakeaways[0] || 'Key takeaway.',
+        description: (parsed.description || '').trim() || fbDescription,
+        hashtags,
       };
     }
-    return { title: fbTitle, takeaways: fbTakeaways, summary: fbTakeaways[0] };
+    return { title: fbTitle, takeaways: fbTakeaways, summary: fbTakeaways[0], description: fbDescription, hashtags: fbHashtags };
   } catch {
-    return { title: fbTitle, takeaways: fbTakeaways, summary: fbTakeaways[0] };
+    return { title: fbTitle, takeaways: fbTakeaways, summary: fbTakeaways[0], description: fbDescription, hashtags: fbHashtags };
   }
 }
 
@@ -884,6 +912,14 @@ export async function generatePersonalizedReel(
       .map((p) => `${p.title}: ${p.text.split(/(?<=[.!?])\s/)[0]}`)
       .slice(0, 6),
     summary: `Personalized cut of "${entryKey}" stitched from ${picked.length} relevant topics for: ${label}.`,
+    description: [
+      `✨ Personalized reel for your interests: ${label}`,
+      '',
+      ...picked.map((p, n) => `${n + 1}. ${p.title} — ${Math.round(p.start)}s–${Math.round(p.end)}s in the original lecture`),
+      '',
+      `📚 Stitched from your library: ${entryKey}`,
+    ].join('\n'),
+    hashtags: [...new Set(picked.flatMap((p) => fallbackHashtags(p.text, p.title)))].slice(0, 8),
     status: 'processing',
     cues: [],
     personalized: true,
@@ -967,6 +1003,47 @@ export async function generatePersonalizedReel(
 }
 
 // ------------------------------------------------------------------ public API
+
+/**
+ * Map a timestamp inside an uploaded lecture to the rendered reel that
+ * contains it — used by the Ask flow to link answers to reel portions.
+ */
+export function findReelForTimestamp(
+  source: string,
+  startSec: number
+): { source: string; reelId: string; title: string; start: number; end: number; video: string; deepLink: string } | null {
+  const manifest = loadManifest();
+  const norm = normalizeFilename(source);
+  const entryKey = Object.keys(manifest).find((k) => normalizeFilename(k) === norm || k === source || safeName(k) === safeName(source));
+  if (!entryKey) return null;
+  const entry = manifest[entryKey];
+  if (!entry) return null;
+
+  const base = entry.reels.filter((r) => !r.personalized);
+  let reel: ReelInfo | undefined = base.find((r) => startSec >= r.start - 1 && startSec <= r.end + 1);
+  if (!reel && base.length > 0) {
+    // Fall back to the nearest section within 60s of the timestamp
+    const nearest = base.reduce(
+      (best, r) => {
+        const dist = Math.min(Math.abs(startSec - r.start), Math.abs(startSec - r.end));
+        return dist < best.dist ? { reel: r, dist } : best;
+      },
+      { reel: base[0], dist: Infinity }
+    );
+    if (nearest.dist <= 60) reel = nearest.reel;
+  }
+  if (!reel) return null;
+
+  return {
+    source: entryKey,
+    reelId: reel.id,
+    title: reel.title,
+    start: reel.start,
+    end: reel.end,
+    video: reel.video ?? `/reels/${safeName(entryKey)}/`,
+    deepLink: `/reels.html?source=${encodeURIComponent(entryKey)}&reel=${encodeURIComponent(reel.id)}`,
+  };
+}
 
 export function registerVideoFile(source: string, videoPath: string): void {
   const manifest = loadManifest();
@@ -1078,6 +1155,7 @@ async function runReelGeneration(
     // without waiting for the per-section LLM calls).
     const llmTitle = (sec as SectionWindow & { llmTitle?: string }).llmTitle;
     const fallback = fallbackTakeaways(sec.text);
+    const initialTitle = (llmTitle && llmTitle.trim()) || fallbackTitle(sec.text, i);
 
     reels.push({
       id: `${safe}#reel_${String(i + 1).padStart(3, '0')}`,
@@ -1088,13 +1166,15 @@ async function runReelGeneration(
       startSec: sec.start,
       endSec: sec.end,
       durationSec: sec.duration,
-      title: (llmTitle && llmTitle.trim()) || fallbackTitle(sec.text, i),
+      title: initialTitle,
       video: `/reels/${safe}/${fileBase}.mp4`,
       fileUrl: `/reels/${safe}/${fileBase}.mp4`,
       captions: `/reels/${safe}/${srtFileName}`,
       transcript: sec.text,
       takeaways: fallback,
       summary: fallback[0] || `Key highlights from ${Math.round(sec.duration)}s of the lecture.`,
+      description: `${initialTitle}\n\n${fallback[0] ?? ''}\n\n📚 From your library: ${source}`.trim(),
+      hashtags: fallbackHashtags(sec.text, initialTitle),
       status: 'processing',
       cues: sec.cues,
       generatedAt: new Date().toISOString(),
@@ -1125,6 +1205,8 @@ async function runReelGeneration(
       reels[i].title = meta.title;
       reels[i].takeaways = meta.takeaways;
       reels[i].summary = meta.summary;
+      reels[i].description = meta.description;
+      reels[i].hashtags = meta.hashtags;
     } catch (err) {
       console.error(`[reels] metadata enrichment failed for clip ${i + 1}:`, (err as Error).message);
     }
