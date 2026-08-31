@@ -15,6 +15,7 @@ import { chunkSegments } from '../services/chunking.service.js';
 import { indexChunks } from '../services/rag.service.js';
 import { generateCardsForSource } from '../services/content-cards.service.js';
 import { registerVideoFile, startReelGeneration } from '../services/reel.service.js';
+import { normalizeFilename } from '../middleware/upload.middleware.js';
 import type { MediaIngestResponse, PdfIngestResponse } from '../types/ingest.js';
 
 export function ingestPdf(req: Request, res: Response<PdfIngestResponse>, next: NextFunction): void {
@@ -29,6 +30,7 @@ export function ingestVideo(req: Request, res: Response<MediaIngestResponse>, ne
 
 function handlePdf(req: Request, res: Response<PdfIngestResponse>, next: NextFunction): void {
   const staged = req.file!.path;
+  const fileName = normalizeFilename(req.file!.originalname);
   runPipeline(
     async () => {
       const segments = await extractPdfSegments(staged, {
@@ -39,12 +41,12 @@ function handlePdf(req: Request, res: Response<PdfIngestResponse>, next: NextFun
         maxChars: config.chunkMaxChars,
         overlapChars: config.chunkOverlapChars,
       });
-      const indexed = await safeRagIndex(req.file!.originalname, chunks);
-      if (indexed > 0) startCardGeneration(req.file!.originalname);
+      const indexed = await safeRagIndex(fileName, chunks);
+      if (indexed > 0) startCardGeneration(fileName);
       return {
         ok: true as const,
         type: 'pdf' as const,
-        fileName: req.file!.originalname,
+        fileName,
         stats: {
           pages: segments.length,
           ocrUsed: segments.some((s) => s.meta.extraction === 'ocr'),
@@ -62,7 +64,7 @@ function handlePdf(req: Request, res: Response<PdfIngestResponse>, next: NextFun
 
 function handleVideo(req: Request, res: Response<MediaIngestResponse>, next: NextFunction): void {
   const staged = req.file!.path;
-  const fileName = req.file!.originalname;
+  const fileName = normalizeFilename(req.file!.originalname);
   const preservedPath = path.join(config.uploadDir, fileName);
 
   // Preserve the video file in uploads/<originalname> so reel rendering has access to it

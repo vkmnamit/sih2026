@@ -35,6 +35,23 @@
   .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
   .sub code { color: #a5b4fc; background: rgba(99,102,241,0.12); padding: 2px 6px; border-radius: 4px; }
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin-bottom: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); }
+  
+  /* Upload Mode Tabs */
+  .upload-tabs {
+    display: flex; gap: 8px; margin-bottom: 16px;
+  }
+  .upload-tab {
+    flex: 1; padding: 11px 16px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--muted); font-size: 13.5px; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: all .2s;
+  }
+  .upload-tab:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+  .upload-tab.active {
+    background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(236,72,153,0.12));
+    border-color: var(--accent); color: #fff; box-shadow: 0 4px 14px rgba(99,102,241,0.2);
+  }
+
   #dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 36px 20px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; background: rgba(255,255,255,0.01); }
   #dropzone.drag { border-color: var(--accent); background: rgba(99,102,241,.08); }
   #dropzone .icon { font-size: 38px; margin-bottom: 8px; }
@@ -128,15 +145,24 @@
   </div>
 
   <div class="card">
-    <h2>📤 Ingest Material (PDF, MP4, MOV, WebM, MP3)</h2>
-    <div id="dropzone">
-      <div class="icon">📁</div>
-      <div><strong>Drop a PDF or Video/Audio file here</strong> or click to browse</div>
-      <div class="hint">Supported: .pdf, .mp4, .mov, .webm, .mkv, .mp3, .wav, .m4a (max 500 MB)</div>
-      <input type="file" id="fileInput" accept=".pdf,.mp4,.mov,.webm,.mkv,.avi,.mp3,.wav,.m4a,application/pdf,video/*,audio/*" />
+    <div class="upload-tabs">
+      <button class="upload-tab active" id="tabVideo" data-mode="video">
+        <span>🎥 Upload Video / Lecture</span>
+      </button>
+      <button class="upload-tab" id="tabPdf" data-mode="pdf">
+        <span>📄 Upload PDF Document</span>
+      </button>
     </div>
+
+    <div id="dropzone">
+      <div class="icon" id="dropzoneIcon">🎥</div>
+      <div id="dropzoneTitle"><strong>Drop your Video or Lecture file here</strong> or click to browse</div>
+      <div class="hint" id="dropzoneHint">Supported: .mp4, .mov, .webm, .mkv, .avi, .mp3, .wav (max 500 MB)</div>
+      <input type="file" id="fileInput" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.avi,.mp3,.wav,.m4a" />
+    </div>
+
     <div id="fileBadge">
-      <span id="fileIcon">📄</span>
+      <span id="fileIcon">🎬</span>
       <span class="name" id="fileName"></span>
       <span class="size" id="fileSize"></span>
       <button class="clear" id="fileClear" title="Remove">✕</button>
@@ -147,7 +173,7 @@
     </label>
 
     <div class="actions">
-      <button class="primary" id="uploadBtn" disabled>Upload &amp; Process</button>
+      <button class="primary" id="uploadBtn" disabled>Upload &amp; Generate Reels</button>
       <a href="/reels.html" class="btn-format reels" id="directReelsLink">🎬 Go to 30–60s Reels Studio</a>
       <a href="/carousel.html" class="btn-format carousel" id="directCarouselLink">🎠 Go to Carousel Deck</a>
       <span class="status" id="status"></span>
@@ -220,7 +246,12 @@
 </div>
 
 <script>
+const tabVideo = document.getElementById('tabVideo');
+const tabPdf = document.getElementById('tabPdf');
 const dropzone  = document.getElementById('dropzone');
+const dropzoneIcon = document.getElementById('dropzoneIcon');
+const dropzoneTitle = document.getElementById('dropzoneTitle');
+const dropzoneHint = document.getElementById('dropzoneHint');
 const fileInput = document.getElementById('fileInput');
 const fileBadge = document.getElementById('fileBadge');
 const fileIcon  = document.getElementById('fileIcon');
@@ -234,9 +265,35 @@ const errorBox  = document.getElementById('errorBox');
 const results   = document.getElementById('results');
 const apiBase   = document.getElementById('apiBase');
 
+let currentUploadMode = 'video';
 let selectedFile = null;
 
-// ---- file selection ----
+// ---- Tab Switching ----
+tabVideo.addEventListener('click', () => setUploadMode('video'));
+tabPdf.addEventListener('click', () => setUploadMode('pdf'));
+
+function setUploadMode(mode) {
+  currentUploadMode = mode;
+  tabVideo.classList.toggle('active', mode === 'video');
+  tabPdf.classList.toggle('active', mode === 'pdf');
+
+  if (mode === 'video') {
+    dropzoneIcon.textContent = '🎥';
+    dropzoneTitle.innerHTML = '<strong>Drop your Video or Lecture file here</strong> or click to browse';
+    dropzoneHint.textContent = 'Supported: .mp4, .mov, .webm, .mkv, .avi, .mp3, .wav (max 500 MB)';
+    fileInput.accept = 'video/*,audio/*,.mp4,.mov,.webm,.mkv,.avi,.mp3,.wav,.m4a';
+    uploadBtn.textContent = 'Upload & Generate Reels';
+  } else {
+    dropzoneIcon.textContent = '📄';
+    dropzoneTitle.innerHTML = '<strong>Drop your PDF document here</strong> or click to browse';
+    dropzoneHint.textContent = 'Supported: .pdf (MuPDF / OCR, max 500 MB)';
+    fileInput.accept = '.pdf,application/pdf';
+    uploadBtn.textContent = 'Upload & Extract PDF';
+  }
+  setFile(null);
+}
+
+// ---- File Selection ----
 dropzone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
 dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
@@ -258,7 +315,6 @@ function setFile(f) {
     const isVid = /\.(mp4|mov|webm|mkv|avi|mp3|wav|m4a)$/i.test(selectedFile.name);
     fileIcon.textContent = isVid ? '🎬' : '📄';
 
-    // Update direct links
     document.getElementById('directReelsLink').href = `/reels.html?source=${encodeURIComponent(selectedFile.name)}`;
     document.getElementById('directCarouselLink').href = `/carousel.html?source=${encodeURIComponent(selectedFile.name)}`;
   }
@@ -272,7 +328,7 @@ function formatBytes(n) {
   return (n / 1024 / 1024).toFixed(1) + ' MB';
 }
 
-// ---- upload ----
+// ---- Upload ----
 uploadBtn.addEventListener('click', doUpload);
 
 async function doUpload() {
@@ -283,7 +339,7 @@ async function doUpload() {
 
   uploadBtn.disabled = true;
   resetStatus();
-  setStatus(isVideo ? 'Transcribing video & preparing 30–60s reels…' : 'Uploading & processing PDF…', '');
+  setStatus(isVideo ? '⏳ Step 1/3 — Transcribing with Whisper…' : 'Uploading & processing PDF…', '');
   bar.classList.add('show');
   results.classList.add('hidden');
 
@@ -299,14 +355,33 @@ async function doUpload() {
       throw new Error(msg);
     }
     render(data);
-    setStatus('✅ Done — ' + data.stats.chunks + ' chunks indexed.', 'ok');
-    refreshKbStats();
-    loadCards();
-    pollCards();
 
     if (data.fileName) {
       cardsSourceSelect.value = data.fileName;
       updateToolbarLinks(data.fileName);
+
+      if (isVideo) {
+        setStatus('🧠 Step 2/3 — AI sectioning into 30–60s clips…', '');
+        try {
+          await fetch(base + '/api/reels/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: data.fileName, targetDurationSec: 45 }),
+          });
+        } catch (e) { /* generation failure is non-fatal */ }
+
+        setStatus('✅ Step 3/3 — Reels queued! Opening Reels Studio…', 'ok');
+        setTimeout(() => {
+          window.location.href = `/reels.html?source=${encodeURIComponent(data.fileName)}`;
+        }, 1200);
+      } else {
+        setStatus('✅ Done — ' + data.stats.chunks + ' chunks indexed.', 'ok');
+        refreshKbStats();
+        loadCards();
+        pollCards();
+      }
+    } else {
+      setStatus('✅ Done — ' + data.stats.chunks + ' chunks indexed.', 'ok');
     }
   } catch (err) {
     showError('Ingestion failed:\n' + (err.message || err));
@@ -317,7 +392,7 @@ async function doUpload() {
   }
 }
 
-// ---- rendering ----
+// ---- Rendering ----
 function render(data) {
   results.classList.remove('hidden');
   const isVid = data.type === 'video';

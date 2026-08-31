@@ -53,17 +53,31 @@
   // ---------- source list ----------
   async function loadSources() {
     try {
-      var res = await fetch('/api/cards');
-      var data = await res.json();
-      var all = data.cards || [];
       var seen = {};
       var sources = [];
-      all.forEach(function (c) {
-        if (c.source && !seen[c.source]) {
-          seen[c.source] = true;
-          sources.push(c.source);
-        }
-      });
+
+      try {
+        var resCards = await fetch('/api/cards');
+        var dataCards = await resCards.json();
+        (dataCards.cards || []).forEach(function (c) {
+          if (c.source && !seen[c.source]) {
+            seen[c.source] = true;
+            sources.push(c.source);
+          }
+        });
+      } catch (e) {}
+
+      try {
+        var resStats = await fetch('/api/ask/_stats');
+        var dataStats = await resStats.json();
+        (dataStats.sourceNames || []).forEach(function (s) {
+          if (s && !seen[s]) {
+            seen[s] = true;
+            sources.push(s);
+          }
+        });
+      } catch (e) {}
+
       sources.sort();
 
       sourceSelect.innerHTML = '';

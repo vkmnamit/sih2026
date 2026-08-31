@@ -252,21 +252,33 @@ export interface ReelInfo {
   id: string;
   /** Uploaded file this reel was cut from */
   source: string;
-  /** Clip window within the original video */
-  startSec: number;
-  endSec: number;
+  /** Clip window start in seconds */
+  start: number;
+  /** Clip window end in seconds */
+  end: number;
   /** Duration in seconds */
+  duration: number;
+  /** Aliases for compatibility */
+  startSec?: number;
+  endSec?: number;
   durationSec?: number;
   /** Short hook/title shown over the reel */
   title: string;
-  /** URL to the rendered mp4 (e.g. /reels/lecture_mp4/reel_0.mp4) */
-  fileUrl: string;
-  /** Original video source URL if available */
-  sourceVideoUrl?: string;
+  /** URL to the rendered mp4 (e.g. /reels/lecture_01/reel_001.mp4) */
+  video: string;
+  /** Compatibility alias for video URL */
+  fileUrl?: string;
+  /** URL to the generated SRT subtitle file */
+  captions?: string;
   /** Text content/transcript for this reel window */
-  transcript?: string;
-  /** Summary or key takeaway for this reel */
+  transcript: string;
+  /** Key bullet-point takeaways */
+  takeaways: string[];
+  /** 1-sentence summary */
   summary?: string;
+  /** Per-clip rendering status */
+  status: 'ready' | 'processing' | 'pending' | 'failed';
+  error?: string;
   /** Subtitle cues with relative timestamps */
   cues?: Array<{ startSec: number; endSec: number; text: string }>;
   /** Render time */
@@ -276,7 +288,7 @@ export interface ReelInfo {
 /** Per-source reel set + generation job status. */
 export interface ReelSet {
   source: string;
-  status: 'idle' | 'generating' | 'ready' | 'failed';
+  status: 'completed' | 'processing' | 'generating' | 'ready' | 'idle' | 'failed';
   error?: string;
   videoAvailable: boolean;
   durationSec?: number;

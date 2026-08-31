@@ -116,7 +116,7 @@ body {
   align-items: center;
   gap: 8px;
   flex: 1;
-  min-width: 220px;
+  min-width: 200px;
 }
 .bar-label {
   font-size: 12px;
@@ -140,6 +140,26 @@ select.custom-select {
   transition: border-color 0.2s;
 }
 select.custom-select:focus { border-color: var(--accent); }
+
+.btn-action {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.15s, opacity 0.2s;
+  white-space: nowrap;
+}
+.btn-action.upload {
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #fff;
+}
+.btn-action.upload:hover { background: rgba(255,255,255,0.16); transform: translateY(-1px); }
 
 .gen-btn {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
@@ -196,6 +216,46 @@ select.custom-select:focus { border-color: var(--accent); }
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--border);
   touch-action: pan-x;
+}
+
+/* Empty State / Upload Prompt inside Viewport */
+.viewport-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 24px;
+  text-align: center;
+  background: linear-gradient(180deg, #111422 0%, #080a10 100%);
+  z-index: 20;
+}
+.empty-icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  margin-bottom: 16px;
+  box-shadow: 0 0 24px var(--accent-glow);
+}
+.viewport-empty h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 8px;
+}
+.viewport-empty p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin-bottom: 20px;
+  max-width: 280px;
 }
 
 /* Background video blur canvas */
@@ -487,7 +547,6 @@ select.custom-select:focus { border-color: var(--accent); }
   font-weight: 800;
   color: var(--accent);
   text-transform: uppercase;
-  margin-bottom: 3px;
 }
 .chapter-title {
   font-size: 12.5px;
@@ -505,31 +564,32 @@ select.custom-select:focus { border-color: var(--accent); }
   margin-top: 4px;
 }
 
-/* Modal Bottom Sheets (Takeaway & Transcript) */
+/* Modals */
 .sheet-modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.65);
+  background: rgba(0,0,0,0.7);
   backdrop-filter: blur(8px);
   z-index: 100;
   display: none;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
+  padding: 20px;
 }
 .sheet-modal.open { display: flex; }
 .sheet-content {
   width: 100%;
   max-width: 500px;
-  max-height: 80vh;
+  max-height: 85vh;
   background: #131722;
   border: 1px solid var(--border);
-  border-radius: 24px 24px 0 0;
-  padding: 24px 22px 34px;
+  border-radius: 20px;
+  padding: 24px 22px 28px;
   overflow-y: auto;
-  box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+  animation: modalScale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes modalScale { from { opacity:0; transform: scale(0.95); } to { opacity:1; transform: scale(1); } }
 .sheet-header {
   display: flex;
   align-items: center;
@@ -568,6 +628,139 @@ select.custom-select:focus { border-color: var(--accent); }
   border: 1px solid var(--border);
 }
 
+/* Upload Dropzone inside Modal */
+.upload-dropzone {
+  border: 2px dashed rgba(99, 102, 241, 0.4);
+  border-radius: 16px;
+  padding: 34px 20px;
+  text-align: center;
+  cursor: pointer;
+  background: rgba(99, 102, 241, 0.05);
+  transition: all 0.2s;
+}
+.upload-dropzone:hover, .upload-dropzone.drag {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.12);
+}
+.upload-file-badge {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  background: #1c2234;
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.upload-file-badge.show { display: flex; }
+.upload-progress {
+  height: 6px;
+  background: #1c2234;
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 14px;
+  display: none;
+}
+.upload-progress.show { display: block; }
+.upload-progress-fill {
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: 99px;
+  animation: slide 1.1s infinite linear;
+}
+
+/* Reels Feed (below the player) */
+.reels-feed-wrap {
+  width: 100%;
+  max-width: 900px;
+  margin: 4px auto 70px;
+  padding: 0 16px;
+}
+.reels-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.reels-feed-title { font-size: 15px; font-weight: 800; color: #fff; letter-spacing: -0.3px; }
+.reels-feed-count { font-size: 12px; color: var(--muted); font-weight: 600; }
+.reels-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
+}
+.reels-feed::-webkit-scrollbar { width: 6px; }
+.reels-feed::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.4); border-radius: 99px; }
+.feed-card {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: var(--surface-glass);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.2s, background 0.2s;
+}
+.feed-card:hover { border-color: var(--border-active); transform: translateY(-1px); }
+.feed-card.active { border-color: var(--accent); background: rgba(99, 102, 241, 0.12); }
+.feed-card.slide-in { animation: feedSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes feedSlideIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+.feed-num {
+  width: 34px;
+  height: 58px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: linear-gradient(160deg, var(--accent), var(--accent-2));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+.feed-body { flex: 1; min-width: 0; }
+.feed-top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.feed-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feed-badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+.feed-badge.ready { background: rgba(16, 185, 129, 0.15); color: var(--accent-3); }
+.feed-badge.rendering { background: rgba(245, 158, 11, 0.15); color: var(--yellow); }
+.feed-takeaway {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.feed-time { font-size: 11px; color: var(--muted); margin-top: 5px; opacity: 0.85; }
+
 /* Mobile Responsiveness */
 @media (max-width: 900px) {
   .reel-chapters-sidebar { display: none; }
@@ -599,14 +792,17 @@ select.custom-select:focus { border-color: var(--accent); }
 
 <!-- Studio Controls -->
 <div class="studio-bar">
+  <button id="openUploadBtn" class="btn-action upload">
+    <span>📤 Upload Video</span>
+  </button>
   <div class="bar-group">
-    <span class="bar-label">Source Video:</span>
+    <span class="bar-label">Source:</span>
     <select id="sourceSelect" class="custom-select">
       <option value="">Loading videos...</option>
     </select>
   </div>
-  <div class="bar-group" style="max-width: 160px;">
-    <span class="bar-label">Clip Target:</span>
+  <div class="bar-group" style="max-width: 145px;">
+    <span class="bar-label">Target:</span>
     <select id="durationSelect" class="custom-select">
       <option value="45" selected>45s (Reel)</option>
       <option value="30">30s (Short)</option>
@@ -614,7 +810,7 @@ select.custom-select:focus { border-color: var(--accent); }
     </select>
   </div>
   <button id="genReelsBtn" class="gen-btn" disabled>
-    <span>⚡ Generate 30–60s Reels</span>
+    <span>⚡ Slice into 30–60s Reels</span>
   </button>
   <div id="statusBadge" class="status-pill">
     <span>Ready</span>
@@ -628,6 +824,16 @@ select.custom-select:focus { border-color: var(--accent); }
 
   <!-- 9:16 Vertical Reel Player -->
   <div class="reel-viewport" id="viewport">
+    <!-- Viewport Empty / Prompt View -->
+    <div class="viewport-empty" id="viewportEmpty" style="display:none;">
+      <div class="empty-icon">🎥</div>
+      <h3>No Video Loaded</h3>
+      <p>Upload a video or lecture to automatically generate 30–60 second vertical reels.</p>
+      <button class="gen-btn" id="emptyUploadBtn" style="padding:12px 24px; font-size:14.5px;">
+        📤 Upload Video Now
+      </button>
+    </div>
+
     <!-- Blurred Backdrop for aesthetic ambient glow -->
     <video id="blurVideo" class="blur-bg" muted loop playsinline></video>
 
@@ -678,8 +884,8 @@ select.custom-select:focus { border-color: var(--accent); }
         <span class="action-label" id="likeCount">1.4k</span>
       </div>
       <div class="action-item">
-        <button class="action-btn" id="summaryBtn" title="AI Takeaway">💡</button>
-        <span class="action-label">Summary</span>
+        <button class="action-btn" id="summaryBtn" title="AI Takeaways">💡</button>
+        <span class="action-label">Takeaways</span>
       </div>
       <div class="action-item">
         <button class="action-btn" id="transcriptBtn" title="Full Transcript">📝</button>
@@ -697,16 +903,67 @@ select.custom-select:focus { border-color: var(--accent); }
   </div>
 </div>
 
+<!-- Reels Feed (below the player, auto-populates after upload) -->
+<div class="reels-feed-wrap" id="reelsFeedWrap" style="display:none;">
+  <div class="reels-feed-header">
+    <span class="reels-feed-title">🎬 Reels Feed</span>
+    <span class="reels-feed-count" id="reelsFeedCount"></span>
+  </div>
+  <div class="reels-feed" id="reelsFeed"></div>
+</div>
+
+<!-- Upload Video Modal -->
+<div class="sheet-modal" id="uploadModal">
+  <div class="sheet-content">
+    <div class="sheet-header">
+      <div class="sheet-title">🎥 Upload Video for 30–60s Reels</div>
+      <button class="sheet-close" id="closeUpload">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="upload-dropzone" id="uploadDropzone">
+        <div style="font-size:36px; margin-bottom:10px;">📁</div>
+        <div style="font-weight:700; color:#fff; font-size:15px; margin-bottom:4px;">
+          Drop your video file here or click to browse
+        </div>
+        <div style="font-size:12.5px; color:var(--muted);">
+          Supported formats: .mp4, .mov, .webm, .mkv, .avi, .mp3, .wav (max 500 MB)
+        </div>
+        <input type="file" id="videoFileInput" accept="video/*,audio/*,.mp4,.mov,.webm,.mkv,.avi,.mp3,.wav,.m4a" style="display:none;" />
+      </div>
+
+      <div class="upload-file-badge" id="uploadFileBadge">
+        <span style="font-size:18px;">🎬</span>
+        <span id="uploadFileName" style="font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+        <span id="uploadFileSize" style="color:var(--muted); font-size:12.5px;"></span>
+        <button id="uploadFileClear" style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px;">✕</button>
+      </div>
+
+      <div class="upload-progress" id="uploadProgress">
+        <div class="upload-progress-fill"></div>
+      </div>
+
+      <div id="uploadStatus" style="font-size:13px; color:var(--yellow); margin-top:10px; text-align:center; min-height:18px;"></div>
+
+      <div style="margin-top:16px; display:flex; justify-content:flex-end; gap:10px;">
+        <button id="cancelUploadBtn" style="background:#202638; color:#cbd5e1; border:none; padding:10px 18px; border-radius:8px; font-weight:600; cursor:pointer;">Cancel</button>
+        <button id="submitUploadBtn" class="gen-btn" disabled style="padding:10px 22px;">
+          <span>⚡ Upload &amp; Generate Reels</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- AI Summary Sheet Modal -->
 <div class="sheet-modal" id="summaryModal">
   <div class="sheet-content">
     <div class="sheet-header">
-      <div class="sheet-title">💡 Key Takeaway &amp; Hook</div>
+      <div class="sheet-title">💡 Key Bullet Takeaways</div>
       <button class="sheet-close" id="closeSummary">✕</button>
     </div>
     <div class="sheet-body">
-      <h3 id="modalHookTitle" style="color:#fff; margin-bottom:10px; font-size:16px;"></h3>
-      <p id="modalSummaryText" style="margin-bottom:14px;"></p>
+      <h3 id="modalHookTitle" style="color:#fff; margin-bottom:12px; font-size:16px;"></h3>
+      <div id="modalSummaryText" style="margin-bottom:14px;"></div>
       <div id="modalTimestampText" style="font-size:12px; color:var(--muted);"></div>
     </div>
   </div>
