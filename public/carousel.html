@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Eklavya &mdash; Carousel</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --black: #111; --dark: #1b1b1b; --white: #fafaf7;
+  --purple: #7567d9; --purple-light: #eeeaff;
+  --yellow: #f3d85b; --gray: #777; --border: #deded8;
+}
+body {
+  background: #080808; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--black); min-height: 100vh; display: flex; justify-content: center;
+}
+.app { width: 100%; max-width: 520px; background: #000; min-height: 100vh; overflow: hidden; }
+.selector { padding: 18px; background: #000; color: var(--white); }
+.selector h3 { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+.selector select { width: 100%; padding: 9px 12px; font-size: 14px; border-radius: 8px; border: 1px solid #444; background: #202020; color: var(--white); }
+.selector button { width: 100%; margin-top: 10px; padding: 10px; font-size: 14px; font-weight: 700; border: none; border-radius: 8px; background: var(--purple); color: var(--white); cursor: pointer; }
+.selector button:disabled { opacity: .5; cursor: not-allowed; }
+.status-msg { font-size: 13px; color: var(--yellow); margin-top: 8px; text-align: center; }
+.topbar { height: 66px; display: flex; align-items: center; padding: 0 18px; color: white; gap: 18px; }
+.back { font-size: 34px; font-weight: 200; cursor: pointer; }
+.title { flex: 1; font-size: 19px; font-weight: 750; }
+.more { font-size: 25px; }
+.carousel-wrapper { width: 100%; overflow: hidden; position: relative; touch-action: pan-y; }
+.carousel { display: flex; transition: transform .45s cubic-bezier(.22,.61,.36,1); }
+.card { min-width: 100%; aspect-ratio: 4 / 5; background: var(--white); position: relative; overflow: hidden; padding: 30px 27px; }
+.card::before { content: ""; position: absolute; inset: 0; opacity: .05; background-image: radial-gradient(#000 0.7px, transparent .7px); background-size: 7px 7px; pointer-events: none; }
+.card-content { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; }
+.counter { position: absolute; right: 15px; top: 15px; background: #555; color: white; padding: 8px 13px; border-radius: 20px; font-size: 12px; font-weight: 700; z-index: 5; }
+.category { font-size: 11px; letter-spacing: 1.2px; font-weight: 800; color: #666; margin-bottom: 17px; }
+.year { font-size: 70px; line-height: .9; font-weight: 900; letter-spacing: -4px; margin-bottom: 13px; }
+.year span { color: var(--purple); }
+.heading { font-size: 31px; line-height: 1.08; letter-spacing: -1.2px; margin-bottom: 16px; }
+.highlight { position: relative; z-index: 1; }
+.highlight::after { content: ""; position: absolute; height: 10px; background: var(--yellow); bottom: 1px; left: -4px; right: -4px; z-index: -1; border-radius: 4px; transform: rotate(-1deg); }
+.description { color: #555; font-size: 14px; line-height: 1.6; max-width: 440px; }
+.timeline { margin-top: 22px; display: flex; flex-direction: column; gap: 10px; }
+.event { display: grid; grid-template-columns: 78px 1fr; gap: 12px; align-items: start; padding: 13px; border: 1px solid var(--border); background: white; border-radius: 13px; }
+.date { font-size: 12px; font-weight: 850; color: var(--purple); padding-top: 2px; }
+.event-text { font-size: 13px; line-height: 1.45; color: #444; }
+.event-text strong { color: #111; }
+.event.important { background: var(--purple-light); border-color: #d8d2ff; }
+.event.important .date { color: #5948c5; }
+.big-event { margin-top: auto; background: var(--dark); color: white; padding: 21px; border-radius: 18px; }
+.big-event .small { font-size: 10px; color: #aaa; letter-spacing: 1.2px; font-weight: 800; margin-bottom: 8px; }
+.big-event h3 { font-size: 21px; line-height: 1.15; margin-bottom: 7px; }
+.big-event p { font-size: 12px; color: #ccc; line-height: 1.5; }
+.visual-number { margin: auto; width: 190px; height: 190px; border-radius: 50%; background: var(--purple-light); display: flex; flex-direction: column; justify-content: center; align-items: center; border: 1px solid #ddd7ff; }
+.visual-number strong { font-size: 55px; letter-spacing: -3px; color: var(--purple); }
+.visual-number span { font-size: 12px; color: #666; margin-top: 5px; }
+.takeaway { margin-top: auto; background: var(--dark); color: white; padding: 19px; border-radius: 16px; }
+.takeaway small { display: block; font-size: 10px; color: #aaa; letter-spacing: 1px; margin-bottom: 7px; font-weight: 800; }
+.takeaway p { font-size: 16px; font-weight: 700; line-height: 1.4; }
+.dots { position: absolute; bottom: 13px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 5px; background: rgba(30,30,30,.7); padding: 7px 11px; border-radius: 20px; backdrop-filter: blur(8px); z-index: 10; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #aaa; }
+.dot.active { width: 19px; background: white; border-radius: 10px; }
+.actions { height: 56px; display: flex; align-items: center; gap: 20px; padding: 0 18px; color: white; }
+.action { font-size: 26px; cursor: pointer; }
+.save { margin-left: auto; }
+.likes { padding: 0 18px; font-size: 13px; font-weight: 750; color: white; }
+.creator { display: flex; align-items: center; gap: 11px; padding: 15px 18px 10px; color: white; }
+.avatar { width: 42px; height: 42px; border-radius: 50%; background: white; color: black; display: flex; justify-content: center; align-items: center; font-weight: 900; }
+.creator-info { flex: 1; }
+.creator-name { font-size: 15px; font-weight: 800; }
+.creator-sub { font-size: 11px; color: #999; margin-top: 3px; }
+.follow { border: 1px solid white; background: transparent; color: white; padding: 7px 15px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+.caption { padding: 5px 18px 17px; color: #ddd; font-size: 13px; line-height: 1.5; }
+.caption strong { color: white; }
+.tags { color: #aaa; margin-top: 4px; }
+.comment { margin: 0 18px 22px; background: #202020; color: #888; border-radius: 24px; padding: 12px 17px; font-size: 13px; }
+@media(max-width:600px) {
+  .card { padding: 27px 22px; }
+  .year { font-size: 61px; }
+  .heading { font-size: 29px; }
+  .event { grid-template-columns: 70px 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="selector" id="selector">
+    <h3>Carousel &mdash; select a source</h3>
+    <select id="sourceSelect"><option value="">Loading...</option></select>
+    <button id="genBtn" disabled>Generate Carousel Cards</button>
+    <div class="status-msg" id="genStatus"></div>
+  </div>
+  <div class="topbar" id="topbar" style="display:none;">
+    <div class="back" id="backBtn">Back</div>
+    <div class="title" id="topbarTitle">Eklavya</div>
+    <div class="more">...</div>
+  </div>
+  <div class="carousel-wrapper" id="wrapper" style="display:none;">
+    <div class="carousel" id="carousel"></div>
+    <div class="dots" id="dots"></div>
+  </div>
+  <div class="actions" id="actions" style="display:none;">
+    <div class="action" id="like">Like</div>
+    <div class="action">Share</div>
+    <div class="action">More</div>
+    <div class="action save">Save</div>
+  </div>
+  <div class="likes" id="likes" style="display:none;">2,505 likes</div>
+  <div class="creator" id="creator" style="display:none;">
+    <div class="avatar">E</div>
+    <div class="creator-info">
+      <div class="creator-name">eklavya</div>
+      <div class="creator-sub">AI-powered learning</div>
+    </div>
+    <button class="follow">Follow</button>
+  </div>
+  <div class="caption" id="caption" style="display:none;">
+    <strong>eklavya</strong>
+    <span id="captionText"></span>
+    <div class="tags" id="tags"></div>
+  </div>
+    <div class="comment">Add comment...</div>
+</div>
+
+<script src="carousel.js"></script>
+</body>
+</html>

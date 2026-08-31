@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Eklavya — PDF Ingest Tester</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --panel-2: #1e222e; --border: #2a2f3d;
+    --text: #e6e9f0; --muted: #8b93a7; --accent: #4f8cff; --accent-2: #22c55e;
+    --warn: #f59e0b; --err: #ef4444; --radius: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 0 0 14px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .sub code { color: var(--accent); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+  #dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 42px 20px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  #dropzone.drag { border-color: var(--accent); background: rgba(79,140,255,.08); }
+  #dropzone .icon { font-size: 34px; margin-bottom: 8px; }
+  #dropzone .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  #fileInput { display: none; }
+  #fileBadge { display: none; align-items: center; gap: 10px; margin-top: 14px; background: var(--panel-2); border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; font-size: 14px; }
+  #fileBadge.show { display: flex; }
+  #fileBadge .name { font-weight: 600; word-break: break-all; }
+  #fileBadge .size { color: var(--muted); white-space: nowrap; }
+  #fileBadge .clear { margin-left: auto; cursor: pointer; color: var(--muted); background: none; border: none; font-size: 16px; }
+  #fileBadge .clear:hover { color: var(--err); }
+  .actions { display: flex; gap: 12px; margin-top: 16px; align-items: center; }
+  button.primary { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 12px 26px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button.primary:disabled { opacity: .45; cursor: not-allowed; }
+  .status { font-size: 14px; color: var(--muted); }
+  .status.ok { color: var(--accent-2); }
+  .status.err { color: var(--err); }
+  .bar { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 14px; display: none; }
+  .bar.show { display: block; }
+  .bar > div { height: 100%; width: 35%; background: var(--accent); border-radius: 4px; animation: slide 1.1s infinite linear; }
+  @keyframes slide { from { margin-left: -35%; } to { margin-left: 100%; } }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .stat { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+  .stat .val { font-size: 24px; font-weight: 700; }
+  .stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .pill { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); }
+  .pill.ocr { color: var(--warn); border-color: var(--warn); }
+  .pill.mupdf { color: var(--accent-2); border-color: var(--accent-2); }
+  .chunk { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .chunk summary { cursor: pointer; padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: 14px; list-style: none; }
+  .chunk summary::-webkit-details-marker { display: none; }
+  .chunk summary:hover { background: rgba(255,255,255,.03); }
+  .chunk .cid { color: var(--accent); font-family: ui-monospace, monospace; font-size: 12px; }
+  .chunk .cmeta { color: var(--muted); font-size: 12px; margin-left: auto; white-space: nowrap; }
+  .chunk .body { padding: 0 16px 14px; }
+  .chunk pre { white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.55; margin: 0; color: #c9d1e0; }
+  #rawJson { width: 100%; height: 300px; background: var(--panel-2); color: #c9d1e0; border: 1px solid var(--border); border-radius: 10px; padding: 14px; font: 12px ui-monospace, monospace; resize: vertical; }
+  .errbox { background: rgba(239,68,68,.1); border: 1px solid var(--err); color: #fca5a5; border-radius: 10px; padding: 14px; font-size: 14px; white-space: pre-wrap; }
+  .hidden { display: none; }
+  label.cfg { display: block; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  label.cfg input { width: 100%; margin-top: 4px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+
+  /* Post cards (AI Content Engine) */
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .pcard { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .pcard.topic { border-color: var(--accent); }
+  .pcard .badge { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .pcard.topic .badge { color: var(--accent); }
+  .pcard h3 { margin: 0; font-size: 16px; line-height: 1.3; }
+  .pcard .desc { font-size: 13px; color: #c9d1e0; line-height: 1.5; margin: 0; }
+  .pcard ul.kp { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .quiz-q { font-size: 13px; font-weight: 600; margin-top: 4px; }
+  .quiz-opts { display: flex; flex-direction: column; gap: 6px; }
+  .quiz-opts button { text-align: left; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; cursor: pointer; }
+  .quiz-opts button:hover { border-color: var(--accent); }
+  .quiz-opts button.correct { border-color: var(--accent-2); color: var(--accent-2); }
+  .quiz-opts button.wrong { border-color: var(--err); color: var(--err); }
+  .quiz-opts button:disabled { cursor: default; opacity: .85; }
+  .quiz-expl { font-size: 12px; color: var(--accent-2); line-height: 1.5; display: none; }
+  .quiz-expl.show { display: block; }
+  .quiz-expl.bad { color: var(--err); }
+  .cards-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .cards-toolbar select { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+  button.small { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  button.small:disabled { opacity: .45; cursor: not-allowed; }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📄 Eklavya — PDF Ingest Tester</h1>
+  <div class="sub">Upload a PDF and watch it go through <code>MuPDF → OCR fallback → chunking</code>. Endpoint: <code>POST /api/ingest/pdf</code></div>
+
+  <div class="card">
+    <div id="dropzone">
+      <div class="icon">🗂️</div>
+      <div><strong>Drop a PDF here</strong> or click to choose a file</div>
+      <div class="hint">Only .pdf files are accepted (max 500 MB)</div>
+      <input type="file" id="fileInput" accept=".pdf,application/pdf" />
+    </div>
+    <div id="fileBadge">
+      <span>📄</span>
+      <span class="name" id="fileName"></span>
+      <span class="size" id="fileSize"></span>
+      <button class="clear" id="fileClear" title="Remove">✕</button>
+    </div>
+
+    <label class="cfg">API base URL (leave empty if the backend serves this page)
+      <input id="apiBase" value="" placeholder="http://localhost:3000" />
+    </label>
+
+    <div class="actions">
+      <button class="primary" id="uploadBtn" disabled>Upload &amp; Ingest</button>
+      <span class="status" id="status"></span>
+    </div>
+    <div class="bar" id="bar"><div></div></div>
+    <div id="errorBox" class="errbox hidden" style="margin-top:14px"></div>
+  </div>
+
+  <!-- RAG / AI Tutor -->
+  <div class="card">
+    <h2>🤖 Ask the AI Tutor (RAG)</h2>
+    <div class="sub" style="margin-bottom:14px">Answers are grounded in the chunks indexed from your uploads. <span id="kbStats" class="status"></span></div>
+    <div style="display:flex; gap:12px">
+      <input id="questionInput" placeholder="e.g. Explain binary search" style="flex:1; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:12px 14px; font-size:14px" />
+      <button class="primary" id="askBtn">Ask</button>
+    </div>
+    <div style="margin-top:10px; font-size:13px; color:var(--muted)">Ask about:
+      <select id="sourceSelect" style="margin-left:6px; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:6px 10px; font-size:13px">
+        <option value="">All materials</option>
+      </select>
+    </div>
+    <div id="askError" class="errbox hidden" style="margin-top:14px"></div>
+    <div id="answerBox" class="hidden" style="margin-top:16px">
+      <div style="font-size:13px; color:var(--muted); margin-bottom:8px" id="answerMeta"></div>
+      <div class="chunk"><div class="body"><pre id="answerText"></pre></div></div>
+      <h2 style="margin-top:16px">📚 Sources</h2>
+      <div id="sourceList"></div>
+    </div>
+  </div>
+
+  <!-- Post Cards (AI Content Engine) -->
+  <div class="card">
+    <h2>📚 Post Cards</h2>
+    <div class="sub" style="margin-bottom:12px">Whole-chapter mode splits every big topic into multiple ordered cards — one card per section, with interactive quizzes.</div>
+    <div class="cards-toolbar">
+      <span style="font-size:13px;color:var(--muted)">File:</span>
+      <select id="cardsSourceSelect"><option value="">All files</option></select>
+      <span style="font-size:13px;color:var(--muted)">Coverage:</span>
+      <select id="cardsDepthSelect">
+        <option value="2">Whole chapter (more cards)</option>
+        <option value="1">1 card per topic</option>
+      </select>
+            <button class="small" id="genCardsBtn">✨ Generate cards</button>
+      <a href="carousel.html" class="small" id="carouselLink" style="background:var(--warn);text-decoration:none;">🎠 Carousel view</a>
+      <span class="status" id="cardsStatus"></span>
+    </div>
+    <div id="cardsError" class="errbox hidden"></div>
+    <div id="cardsGrid" class="cards-grid"></div>
+  </div>
+
+  <div id="results" class="hidden">
+    <div class="card">
+      <h2>📊 Stats</h2>
+      <div class="stats">
+        <div class="stat"><div class="val" id="statPages">—</div><div class="lbl">Pages extracted</div></div>
+        <div class="stat"><div class="val" id="statChunks">—</div><div class="lbl">Chunks produced</div></div>
+        <div class="stat"><div class="val" id="statOcr"><span class="pill mupdf">—</span></div><div class="lbl">Extraction method</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>🧩 Chunks <span class="status" id="chunkCount"></span></h2>
+      <div id="chunkList"></div>
+    </div>
+    <div class="card">
+      <h2>🔍 Raw JSON response</h2>
+      <textarea id="rawJson" readonly></textarea>
+    </div>
+  </div>
+</div>
+<script>
+const dropzone  = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const fileBadge = document.getElementById('fileBadge');
+const fileName  = document.getElementById('fileName');
+const fileSize  = document.getElementById('fileSize');
+const fileClear = document.getElementById('fileClear');
+const uploadBtn = document.getElementById('uploadBtn');
+const statusEl  = document.getElementById('status');
+const bar       = document.getElementById('bar');
+const errorBox  = document.getElementById('errorBox');
+const results   = document.getElementById('results');
+const apiBase   = document.getElementById('apiBase');
+
+let selectedFile = null;
+
+// ---- file selection ----
+dropzone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
+dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropzone.classList.remove('drag');
+  if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+});
+fileClear.addEventListener('click', () => setFile(null));
+
+function setFile(f) {
+  errorBox.classList.add('hidden');
+  if (f && !f.name.toLowerCase().endsWith('.pdf')) {
+    showError('Only .pdf files are accepted.');
+    f = null;
+  }
+  selectedFile = f || null;
+  fileBadge.classList.toggle('show', !!selectedFile);
+  if (selectedFile) {
+    fileName.textContent = selectedFile.name;
+    fileSize.textContent = formatBytes(selectedFile.size);
+  }
+  uploadBtn.disabled = !selectedFile;
+  resetStatus();
+}
+
+function formatBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1024 / 1024).toFixed(1) + ' MB';
+}
+
+// ---- upload ----
+uploadBtn.addEventListener('click', doUpload);
+
+async function doUpload() {
+  if (!selectedFile) return;
+  const base = (apiBase.value || window.location.origin).replace(/\/+$/, '');
+  const url = base + '/api/ingest/pdf';
+
+  uploadBtn.disabled = true;
+  resetStatus();
+  setStatus('Uploading & processing… this can take a while if OCR kicks in.', '');
+  bar.classList.add('show');
+  results.classList.add('hidden');
+
+  try {
+    const fd = new FormData();
+    fd.append('file', selectedFile, selectedFile.name);
+
+    const res = await fetch(url, { method: 'POST', body: fd });
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data || data.ok !== true) {
+      const msg = (data && data.error) || ('HTTP ' + res.status + ' ' + res.statusText);
+      throw new Error(msg);
+    }
+    render(data);
+    setStatus('✅ Done — ' + data.stats.chunks + ' chunks from ' + data.stats.pages + ' pages.', 'ok');
+    // Your file is now in the knowledge base — refresh both file pickers and
+    // the cards grid, then watch for the background card generation.
+    refreshKbStats();
+    loadCards();
+    pollCards();
+
+    // Auto-select the just-uploaded file in the Post Cards toolbar so
+    // "Generate cards" (if the auto-run hasn't already finished) targets it.
+    if (data.fileName) {
+      cardsSourceSelect.value = data.fileName;
+    }
+  } catch (err) {
+    showError('Ingestion failed:\n' + (err.message || err) +
+      '\n\nIs the backend running? (npm run dev — then open http://localhost:3000)');
+    setStatus('Failed.', 'err');
+  } finally {
+    bar.classList.remove('show');
+    uploadBtn.disabled = false;
+  }
+}
+
+// ---- rendering ----
+function render(data) {
+  results.classList.remove('hidden');
+  document.getElementById('statPages').textContent  = data.stats.pages;
+  document.getElementById('statChunks').textContent = data.stats.chunks;
+  const ocrEl = document.getElementById('statOcr');
+  ocrEl.innerHTML = data.stats.ocrUsed
+    ? '<span class="pill ocr">OCR used</span>'
+    : '<span class="pill mupdf">MuPDF text</span>';
+  document.getElementById('chunkCount').textContent = '(' + data.chunks.length + ')';
+  document.getElementById('rawJson').value = JSON.stringify(data, null, 2);
+
+  const list = document.getElementById('chunkList');
+  list.innerHTML = '';
+  data.chunks.forEach((c, i) => {
+    const det = document.createElement('details');
+    det.className = 'chunk';
+
+    const metaBits = [];
+    if (c.meta.page != null) {
+      metaBits.push('page ' + c.meta.page + (c.meta.pageEnd && c.meta.pageEnd !== c.meta.page ? '–' + c.meta.pageEnd : ''));
+    }
+    if (c.meta.extraction) metaBits.push(c.meta.extraction);
+
+    const sum = document.createElement('summary');
+    sum.innerHTML =
+      '<span class="cid">#' + (i + 1) + ' · ' + escapeHtml(c.id) + '</span>' +
+      '<span class="cmeta">' + escapeHtml(metaBits.join(' · ')) + ' · ' + c.charCount + ' chars</span>';
+    det.appendChild(sum);
+
+    const body = document.createElement('div');
+    body.className = 'body';
+    const pre = document.createElement('pre');
+    pre.textContent = c.text;
+    body.appendChild(pre);
+    det.appendChild(body);
+    list.appendChild(det);
+  });
+  if (!data.chunks.length) {
+    list.innerHTML = '<div class="status">No chunks were produced — the PDF may be empty or unreadable.</div>';
+  }
+  results.scrollIntoView({ behavior: 'smooth' });
+}
+
+// ---- helpers ----
+function setStatus(msg, cls) { statusEl.textContent = msg; statusEl.className = 'status ' + (cls || ''); }
+function resetStatus() { setStatus('', ''); }
+function showError(msg) { errorBox.textContent = msg; errorBox.classList.remove('hidden'); }
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (ch) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+// ---- RAG / AI Tutor ----
+const questionInput = document.getElementById('questionInput');
+const askBtn = document.getElementById('askBtn');
+const askError = document.getElementById('askError');
+const answerBox = document.getElementById('answerBox');
+const answerMeta = document.getElementById('answerMeta');
+const answerText = document.getElementById('answerText');
+const sourceList = document.getElementById('sourceList');
+const kbStats = document.getElementById('kbStats');
+
+refreshKbStats();
+
+askBtn.addEventListener('click', doAsk);
+questionInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAsk(); });
+
+async function refreshKbStats() {
+  try {
+    const base = (apiBase.value || window.location.origin).replace(/\/+$/, '');
+    const res = await fetch(base + '/api/ask/_stats');
+    const s = await res.json();
+    kbStats.textContent = s.documents
+      ? 'Knowledge base: ' + s.documents + ' chunks from ' + s.sources + ' file(s).'
+      : 'Knowledge base is empty — upload a PDF or video first.';
+    syncSourceDropdowns(s.sourceNames || []);
+  } catch { /* stats are optional */ }
+}
+
+/** Fill both file pickers (Ask panel + Post Cards toolbar) with uploaded files. */
+function syncSourceDropdowns(sourceNames) {
+  [
+    { sel: document.getElementById('sourceSelect'), allLabel: 'All materials' },
+    { sel: cardsSourceSelect, allLabel: 'All files' },
+  ].forEach(({ sel, allLabel }) => {
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">' + allLabel + '</option>';
+    sourceNames.forEach((name) => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    // Prefer keeping the previous selection if it still exists
+    if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+  });
+}
+
+async function doAsk() {
+  const q = questionInput.value.trim();
+  if (!q) return;
+  const base = (apiBase.value || window.location.origin).replace(/\/+$/, '');
+
+  askBtn.disabled = true;
+  askError.classList.add('hidden');
+  answerBox.classList.add('hidden');
+  setStatus('Thinking… (first question is slower: the embedding model loads once)', '');
+
+  try {
+    const res = await fetch(base + '/api/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, source: document.getElementById('sourceSelect').value || undefined }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || data.ok !== true) {
+      throw new Error((data && data.error) || ('HTTP ' + res.status));
+    }
+    answerMeta.textContent =
+      (data.grounded ? '✅ Grounded LLM answer' : '⚠️ Retrieval-only (no LLM key)') +
+      ' · model: ' + data.model + ' · ' + data.sources.length + ' source(s)';
+    answerText.textContent = data.answer;
+    sourceList.innerHTML = '';
+    data.sources.forEach((s, i) => {
+      const loc = [s.source, s.page != null ? ('page ' + s.page + (s.pageEnd ? '-' + s.pageEnd : '')) : null,
+        s.startSec != null ? (fmtTime(s.startSec) + '-' + (s.endSec != null ? fmtTime(s.endSec) : '?')) : null]
+        .filter(Boolean).join(' · ');
+      const det = document.createElement('details');
+      det.className = 'chunk';
+      det.innerHTML =
+        '<summary><span class="cid">[' + (i + 1) + '] ' + escapeHtml(loc) + '</span>' +
+        '<span class="cmeta">similarity ' + s.score.toFixed(3) + '</span></summary>' +
+        '<div class="body"><pre>' + escapeHtml(s.snippet) + '</pre></div>';
+      sourceList.appendChild(det);
+    });
+    answerBox.classList.remove('hidden');
+    answerBox.scrollIntoView({ behavior: 'smooth' });
+    setStatus('✅ Answer ready.', 'ok');
+  } catch (err) {
+    askError.textContent = 'Ask failed:\n' + (err.message || err);
+    askError.classList.remove('hidden');
+    setStatus('Failed.', 'err');
+  } finally {
+    askBtn.disabled = false;
+    refreshKbStats();
+  }
+}
+
+function fmtTime(sec) {
+  return Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0');
+}
+
+// ---- Post Cards (AI Content Engine) ----
+const cardsSourceSelect = document.getElementById('cardsSourceSelect');
+const genCardsBtn = document.getElementById('genCardsBtn');
+const cardsStatus = document.getElementById('cardsStatus');
+const cardsError = document.getElementById('cardsError');
+const cardsGrid = document.getElementById('cardsGrid');
+
+genCardsBtn.addEventListener('click', generateCards);
+cardsSourceSelect.addEventListener('change', loadCards);
+cardsSourceSelect.addEventListener('change', function() {
+  const src = cardsSourceSelect.value;
+  const link = document.getElementById('carouselLink');
+  link.href = 'carousel.html' + (src ? '?source=' + encodeURIComponent(src) : '');
+});
+loadCards();
+
+/**
+ * Repeatedly reload the cards grid so cards generated in the background
+ * (right after an upload) appear without a manual page refresh.
+ */
+function pollCards(checksLeft = 8) {
+  if (checksLeft <= 0) return;
+  const src = cardsSourceSelect.value;
+  setTimeout(async () => {
+    await loadCards();
+    // Stop polling once this file actually has cards
+    try {
+      const base = (apiBase.value || window.location.origin).replace(/\/+$/, '');
+      const res = await fetch(base + '/api/cards' + (src ? '?source=' + encodeURIComponent(src) : ''));
+      const data = await res.json();
+      if ((data.cards || []).length > 0) return;
+    } catch { /* keep polling */ }
+    pollCards(checksLeft - 1);
+  }, 10000);
+}
+
+async function loadCards() {
+  const base = (apiBase.value || window.location.origin).replace(/\/+$/, '');
+  const src = cardsSourceSelect.value;
+  try {
+    const res = await fetch(base + '/api/cards' + (src ? '?source=' + encodeURIComponent(src) : ''));
+    const data = await res.json();
+    renderCards(data.cards || []);
+  } catch { /* grid just stays as-is */ }
+}
+
+async function generateCards() {
+  const base = (apiBase.value || window.location.origin).replace(/\/+$/, '');
+  const src = cardsSourceSelect.value;
+  if (!src) {
+    cardsError.textContent = 'Pick a file first — cards are generated per upload.';
+    cardsError.classList.remove('hidden');
+    return;
+  }
+  genCardsBtn.disabled = true;
+  cardsError.classList.add('hidden');
+  cardsStatus.className = 'status';
+  cardsStatus.textContent = document.getElementById('cardsDepthSelect').value === '2'
+    ? '🧠 Generating whole chapter… one card per section. Big files take a few minutes.'
+    : '🧠 Generating one card per topic… this can take 1–3 minutes.';
+
+  try {
+    const res = await fetch(base + '/api/cards/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: src, depth: Number(document.getElementById('cardsDepthSelect').value) }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || data.ok !== true) {
+      throw new Error((data && data.error) || ('HTTP ' + res.status));
+    }
+    renderCards(data.cards);
+    cardsStatus.className = 'status ok';
+    cardsStatus.textContent = '✅ ' + data.cards.length + ' cards ready.';
+  } catch (err) {
+    cardsError.textContent = 'Card generation failed:\n' + (err.message || err);
+    cardsError.classList.remove('hidden');
+    cardsStatus.textContent = '';
+  } finally {
+    genCardsBtn.disabled = false;
+  }
+}
+
+function renderCards(cards) {
+  cardsGrid.innerHTML = '';
+  if (!cards.length) {
+    cardsGrid.innerHTML = '<div class="status">No cards yet — generate them for one of your uploads.</div>';
+    return;
+  }
+  cards.forEach((card) => {
+    const isTopic = !card.parentTopic;
+    const div = document.createElement('div');
+    div.className = 'pcard' + (isTopic ? ' topic' : '');
+
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    badge.textContent = isTopic ? '📌 Topic' : '↳ Subtopic of ' + card.parentTopic;
+    div.appendChild(badge);
+
+    const h3 = document.createElement('h3');
+    h3.textContent = card.name;
+    div.appendChild(h3);
+
+    const desc = document.createElement('p');
+    desc.className = 'desc';
+    desc.textContent = card.description;
+    div.appendChild(desc);
+
+    if (card.keyPoints && card.keyPoints.length) {
+      const ul = document.createElement('ul');
+      ul.className = 'kp';
+      card.keyPoints.forEach((kp) => {
+        const li = document.createElement('li');
+        li.textContent = kp;
+        ul.appendChild(li);
+      });
+      div.appendChild(ul);
+    }
+
+    (card.quiz || []).forEach((q) => div.appendChild(renderQuiz(q)));
+    cardsGrid.appendChild(div);
+  });
+}
+
+function renderQuiz(q) {
+  const wrap = document.createElement('div');
+  const qEl = document.createElement('div');
+  qEl.className = 'quiz-q';
+  qEl.textContent = '🧠 ' + q.question;
+  wrap.appendChild(qEl);
+
+  const opts = document.createElement('div');
+  opts.className = 'quiz-opts';
+  const expl = document.createElement('div');
+  expl.className = 'quiz-expl';
+
+  let answered = false;
+  q.options.forEach((optText, idx) => {
+    const btn = document.createElement('button');
+    btn.textContent = optText;
+    btn.addEventListener('click', () => {
+      if (answered) return;
+      answered = true;
+      const correct = idx === q.answerIndex;
+      btn.classList.add(correct ? 'correct' : 'wrong');
+      if (!correct) opts.children[q.answerIndex].classList.add('correct');
+      Array.from(opts.children).forEach((b) => (b.disabled = true));
+      expl.textContent = (correct ? '✅ ' : '❌ ') + q.explanation;
+      expl.classList.add('show');
+      if (!correct) expl.classList.add('bad');
+    });
+    opts.appendChild(btn);
+  });
+
+  wrap.appendChild(opts);
+  wrap.appendChild(expl);
+  return wrap;
+}
+
+
+</script>
+
+</body>
+</html>
+

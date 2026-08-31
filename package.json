@@ -1,0 +1,32 @@
+{
+  "name": "eklavya-backend",
+  "version": "1.0.0",
+  "description": "Eklavya content ingestion backend: PDF (PyMuPDF/OCR) + Video (Whisper) pipelines",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx watch src/server.ts",
+    "test": "npm run build && tsx tests/run-tests.ts",
+    "fixtures": "tsx tests/make-fixtures.ts",
+    "test:content": "npm run build && tsx tests/run-linkedin-test.ts"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@supabase/supabase-js": "^2.112.4",
+    "express": "^5.2.1",
+    "multer": "^2.3.0",
+    "mupdf": "^1.28.0",
+    "nodejs-whisper": "^0.3.1",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^26.4.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}

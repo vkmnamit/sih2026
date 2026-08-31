@@ -1,0 +1,8 @@
+node_modules/
+dist/
+uploads/
+models/
+data/
+.env
+*.log
+eng.traineddata
