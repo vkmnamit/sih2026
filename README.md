@@ -714,6 +714,82 @@ source name
 
 ---
 
+### GET /api/reels
+
+Get generated 30–60s vertical (9:16) reels across uploaded videos, with live rendering status.
+
+**Auth required:** No
+
+**Query parameters:**
+
+| Param | Type | Description |
+|---|---|---|
+| `source` | string | Filter reels by video source name e.g. `?source=lecture.mp4` |
+
+**Response 200:**
+```json
+{
+  "ok": true,
+  "source": "lecture.mp4",
+  "status": "ready",
+  "videoAvailable": true,
+  "durationSec": 14.8,
+  "reels": [
+    {
+      "id": "lecture.mp4#reel_0",
+      "source": "lecture.mp4",
+      "startSec": 0,
+      "endSec": 14.84,
+      "durationSec": 14.8,
+      "title": "Binary Search: Halve The Problem",
+      "summary": "Binary search cuts a sorted array in half each step...",
+      "transcript": "Today we are going to understand binary search...",
+      "cues": [
+        { "startSec": 0, "endSec": 14.84, "text": "Today we are going to understand binary search..." }
+      ],
+      "fileUrl": "/reels/lecture_mp4/reel_00.mp4",
+      "sourceVideoUrl": "/uploads/lecture.mp4",
+      "generatedAt": "2026-08-31T16:53:02.640Z"
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/reels/generate
+
+Trigger background generation of 30–60s vertical video reels (with burned-in captions and AI hook titles).
+
+**Auth required:** No
+
+**Request body (JSON):**
+```json
+{
+  "source": "lecture.mp4",
+  "targetDurationSec": 45
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `source` | string | YES | Video file name in uploads |
+| `targetDurationSec` | number | NO | Target clip length in seconds (30, 45, 60; default 45) |
+| `sync` | boolean | NO | `true` to block until rendering completes |
+
+**Response 200:**
+```json
+{
+  "ok": true,
+  "source": "lecture.mp4",
+  "started": true,
+  "message": "30–60s reel generation started for \"lecture.mp4\"",
+  "status": "generating"
+}
+```
+
+---
+
 ## Middleware Chain
 
 ```

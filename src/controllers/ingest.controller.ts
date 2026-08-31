@@ -2,10 +2,11 @@
  * Ingest controller — the layer that talks HTTP.
  *
  *   POST /api/ingest/pdf    → pdf.service   → chunking.service
- *   POST /api/ingest/video  → video.service → chunking.service
+ *   POST /api/ingest/video  → video.service → chunking.service → reel.service (30-60s reels)
  *   POST /api/ingest        → auto-detect by extension, then delegate
  */
 import fs from 'node:fs';
+import path from 'node:path';
 import type { Request, Response, NextFunction } from 'express';
 import { config } from '../config/index.js';
 import { extractPdfSegments } from '../services/pdf.service.js';
@@ -13,6 +14,7 @@ import { extractVideoSegments } from '../services/video.service.js';
 import { chunkSegments } from '../services/chunking.service.js';
 import { indexChunks } from '../services/rag.service.js';
 import { generateCardsForSource } from '../services/content-cards.service.js';
+import { registerVideoFile, startReelGeneration } from '../services/reel.service.js';
 import type { MediaIngestResponse, PdfIngestResponse } from '../types/ingest.js';
 
 export function ingestPdf(req: Request, res: Response<PdfIngestResponse>, next: NextFunction): void {
@@ -60,6 +62,19 @@ function handlePdf(req: Request, res: Response<PdfIngestResponse>, next: NextFun
 
 function handleVideo(req: Request, res: Response<MediaIngestResponse>, next: NextFunction): void {
   const staged = req.file!.path;
+  const fileName = req.file!.originalname;
+  const preservedPath = path.join(config.uploadDir, fileName);
+
+  // Preserve the video file in uploads/<originalname> so reel rendering has access to it
+  try {
+    if (staged !== preservedPath) {
+      fs.copyFileSync(staged, preservedPath);
+    }
+    registerVideoFile(fileName, preservedPath);
+  } catch (err) {
+    console.warn('[video] could not preserve video file for reels:', (err as Error).message);
+  }
+
   runPipeline(
     async () => {
       const { segments, durationSec } = await extractVideoSegments(staged, config.uploadDir, {
@@ -69,12 +84,18 @@ function handleVideo(req: Request, res: Response<MediaIngestResponse>, next: Nex
         maxChars: config.chunkMaxChars,
         overlapChars: config.chunkOverlapChars,
       });
-      const indexed = await safeRagIndex(req.file!.originalname, chunks);
-      if (indexed > 0) startCardGeneration(req.file!.originalname);
+      const indexed = await safeRagIndex(fileName, chunks);
+
+      // Auto-trigger AI Content Cards & 30–60s Reels in the background
+      if (indexed > 0) {
+        startCardGeneration(fileName);
+      }
+      startReelGeneration(fileName, { targetDurationSec: 45 });
+
       return {
         ok: true as const,
         type: 'video' as const,
-        fileName: req.file!.originalname,
+        fileName,
         stats: {
           segments: segments.length,
           durationSec,
@@ -86,7 +107,8 @@ function handleVideo(req: Request, res: Response<MediaIngestResponse>, next: Nex
     },
     staged,
     res,
-    next
+    next,
+    staged === preservedPath // don't delete if it was uploaded straight to target
   );
 }
 
@@ -115,12 +137,13 @@ function startCardGeneration(source: string): void {
     .catch((err: Error) => console.error(`[cards] generation failed for "${source}":`, err.message));
 }
 
-/** Shared wrapper: run a pipeline, always clean up the staged upload, forward errors */
+/** Shared wrapper: run a pipeline, clean up staged upload (unless preserved), forward errors */
 async function runPipeline<T>(
   pipeline: () => Promise<T>,
   stagedPath: string,
   res: Response<T>,
-  next: NextFunction
+  next: NextFunction,
+  skipCleanup = false
 ): Promise<void> {
   try {
     const result = await pipeline();
@@ -128,7 +151,8 @@ async function runPipeline<T>(
   } catch (err) {
     next(err);
   } finally {
-    // The staged upload is never needed after the pipeline ran
-    fs.rmSync(stagedPath, { force: true });
+    if (!skipCleanup) {
+      fs.rmSync(stagedPath, { force: true });
+    }
   }
 }

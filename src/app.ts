@@ -18,6 +18,10 @@ export function createApp(): express.Express {
   // Resolved from this file's location (src/ or dist/) → project root/public.
   app.use(express.static(path.resolve(import.meta.dirname, '..', 'public')));
 
+  // Serve rendered MP4 reels and uploaded media
+  app.use('/reels', express.static(config.reelsDir, { acceptRanges: true }));
+  app.use('/uploads', express.static(config.uploadDir, { acceptRanges: true }));
+
   app.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'eklavya-backend', time: new Date().toISOString() });
   });

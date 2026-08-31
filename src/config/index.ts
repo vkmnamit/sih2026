@@ -48,6 +48,17 @@ export const config = {
   /** ffmpeg extracts 16 kHz mono PCM — exactly what whisper.cpp expects */
   audioSampleRate: 16000,
 
+  // ---- Reels (video → 9:16 vertical clips with burned-in captions) ----
+  /** Rendered reels land here: data/reels/<safeSource>/reel_N.mp4 */
+  reelsDir: path.join(ROOT_DIR, 'data', 'reels'),
+  /** Reels rendered per video */
+  reelCount: Number(process.env.REEL_COUNT) || 5,
+  /** Maximum clip length per reel (seconds) */
+  reelMaxSec: Number(process.env.REEL_MAX_SEC) || 30,
+  /** Output canvas (TikTok/Reels/Shorts vertical format) */
+  reelWidth: Number(process.env.REEL_WIDTH) || 1080,
+  reelHeight: Number(process.env.REEL_HEIGHT) || 1920,
+
   // ---- Chunking (shared by both pipelines) ----
   chunkMaxChars: 1200,
   chunkOverlapChars: 150,
@@ -102,6 +113,7 @@ if (!fs.existsSync(config.uploadDir)) {
   fs.mkdirSync(config.uploadDir, { recursive: true });
 }
 fs.mkdirSync(path.dirname(config.vectorStorePath), { recursive: true });
+fs.mkdirSync(config.reelsDir, { recursive: true });
 
 
 export const ALLOWED_PDF_EXTENSIONS = ['.pdf'] as const;

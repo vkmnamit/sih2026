@@ -3,25 +3,41 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Eklavya — PDF Ingest Tester</title>
+<title>Eklavya — Multi-Format AI Learning Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
 <style>
   :root {
-    --bg: #0f1117; --panel: #171a23; --panel-2: #1e222e; --border: #2a2f3d;
-    --text: #e6e9f0; --muted: #8b93a7; --accent: #4f8cff; --accent-2: #22c55e;
-    --warn: #f59e0b; --err: #ef4444; --radius: 12px;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --bg: #0b0e17; --panel: #141824; --panel-2: #1c2234; --border: #2b334a;
+    --text: #f0f3fa; --muted: #8e98b0; --accent: #6366f1; --accent-2: #10b981;
+    --accent-pink: #ec4899; --warn: #f59e0b; --err: #ef4444; --radius: 14px;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); min-height: 100vh; }
-  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  h2 { font-size: 16px; margin: 0 0 14px; }
-  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
-  .sub code { color: var(--accent); }
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
-  #dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 42px 20px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
-  #dropzone.drag { border-color: var(--accent); background: rgba(79,140,255,.08); }
-  #dropzone .icon { font-size: 34px; margin-bottom: 8px; }
+  .header {
+    width: 100%; max-width: 1000px; margin: 0 auto; padding: 18px 20px 0;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; color: #fff; text-decoration: none; }
+  .brand-badge {
+    background: linear-gradient(135deg, var(--accent), var(--accent-pink));
+    width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .nav-pills { display: flex; background: var(--panel); border: 1px solid var(--border); padding: 4px; border-radius: 99px; gap: 4px; }
+  .nav-pill { padding: 7px 15px; border-radius: 99px; font-size: 12.5px; font-weight: 600; color: var(--muted); text-decoration: none; transition: all .2s; }
+  .nav-pill:hover { color: var(--text); }
+  .nav-pill.active { background: linear-gradient(135deg, var(--accent), #4f46e5); color: #fff; }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 24px 20px 80px; }
+  h1 { font-size: 24px; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.5px; }
+  h2 { font-size: 17px; font-weight: 750; margin: 0 0 14px; }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+  .sub code { color: #a5b4fc; background: rgba(99,102,241,0.12); padding: 2px 6px; border-radius: 4px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; margin-bottom: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); }
+  #dropzone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 36px 20px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; background: rgba(255,255,255,0.01); }
+  #dropzone.drag { border-color: var(--accent); background: rgba(99,102,241,.08); }
+  #dropzone .icon { font-size: 38px; margin-bottom: 8px; }
   #dropzone .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
   #fileInput { display: none; }
   #fileBadge { display: none; align-items: center; gap: 10px; margin-top: 14px; background: var(--panel-2); border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; font-size: 14px; }
@@ -30,33 +46,35 @@
   #fileBadge .size { color: var(--muted); white-space: nowrap; }
   #fileBadge .clear { margin-left: auto; cursor: pointer; color: var(--muted); background: none; border: none; font-size: 16px; }
   #fileBadge .clear:hover { color: var(--err); }
-  .actions { display: flex; gap: 12px; margin-top: 16px; align-items: center; }
-  button.primary { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 12px 26px; font-size: 15px; font-weight: 600; cursor: pointer; }
-  button.primary:disabled { opacity: .45; cursor: not-allowed; }
-  .status { font-size: 14px; color: var(--muted); }
+  .actions { display: flex; gap: 12px; margin-top: 16px; align-items: center; flex-wrap: wrap; }
+  button.primary { background: linear-gradient(135deg, var(--accent), #4f46e5); color: #fff; border: none; border-radius: 10px; padding: 12px 24px; font-size: 14.5px; font-weight: 700; cursor: pointer; transition: transform .15s; }
+  button.primary:hover { transform: translateY(-1px); }
+  button.primary:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  .status { font-size: 13.5px; color: var(--muted); }
   .status.ok { color: var(--accent-2); }
   .status.err { color: var(--err); }
   .bar { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 14px; display: none; }
   .bar.show { display: block; }
   .bar > div { height: 100%; width: 35%; background: var(--accent); border-radius: 4px; animation: slide 1.1s infinite linear; }
   @keyframes slide { from { margin-left: -35%; } to { margin-left: 100%; } }
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
   .stat { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
-  .stat .val { font-size: 24px; font-weight: 700; }
+  .stat .val { font-size: 24px; font-weight: 800; }
   .stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .pill { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); }
+  .pill { display: inline-block; font-size: 12px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--border); font-weight: 700; }
   .pill.ocr { color: var(--warn); border-color: var(--warn); }
   .pill.mupdf { color: var(--accent-2); border-color: var(--accent-2); }
+  .pill.whisper { color: #a855f7; border-color: #a855f7; }
   .chunk { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
-  .chunk summary { cursor: pointer; padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: 14px; list-style: none; }
+  .chunk summary { cursor: pointer; padding: 12px 16px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; list-style: none; font-weight: 600; }
   .chunk summary::-webkit-details-marker { display: none; }
   .chunk summary:hover { background: rgba(255,255,255,.03); }
   .chunk .cid { color: var(--accent); font-family: ui-monospace, monospace; font-size: 12px; }
   .chunk .cmeta { color: var(--muted); font-size: 12px; margin-left: auto; white-space: nowrap; }
   .chunk .body { padding: 0 16px 14px; }
   .chunk pre { white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.55; margin: 0; color: #c9d1e0; }
-  #rawJson { width: 100%; height: 300px; background: var(--panel-2); color: #c9d1e0; border: 1px solid var(--border); border-radius: 10px; padding: 14px; font: 12px ui-monospace, monospace; resize: vertical; }
-  .errbox { background: rgba(239,68,68,.1); border: 1px solid var(--err); color: #fca5a5; border-radius: 10px; padding: 14px; font-size: 14px; white-space: pre-wrap; }
+  #rawJson { width: 100%; height: 260px; background: var(--panel-2); color: #c9d1e0; border: 1px solid var(--border); border-radius: 10px; padding: 14px; font: 12px ui-monospace, monospace; resize: vertical; }
+  .errbox { background: rgba(239,68,68,.1); border: 1px solid var(--err); color: #fca5a5; border-radius: 10px; padding: 14px; font-size: 13.5px; white-space: pre-wrap; }
   .hidden { display: none; }
   label.cfg { display: block; font-size: 13px; color: var(--muted); margin-top: 10px; }
   label.cfg input { width: 100%; margin-top: 4px; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
@@ -65,12 +83,12 @@
   .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
   .pcard { background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
   .pcard.topic { border-color: var(--accent); }
-  .pcard .badge { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .pcard .badge { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
   .pcard.topic .badge { color: var(--accent); }
-  .pcard h3 { margin: 0; font-size: 16px; line-height: 1.3; }
+  .pcard h3 { margin: 0; font-size: 16px; line-height: 1.3; font-weight: 750; }
   .pcard .desc { font-size: 13px; color: #c9d1e0; line-height: 1.5; margin: 0; }
   .pcard ul.kp { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
-  .quiz-q { font-size: 13px; font-weight: 600; margin-top: 4px; }
+  .quiz-q { font-size: 13px; font-weight: 700; margin-top: 4px; }
   .quiz-opts { display: flex; flex-direction: column; gap: 6px; }
   .quiz-opts button { text-align: left; background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; cursor: pointer; }
   .quiz-opts button:hover { border-color: var(--accent); }
@@ -81,37 +99,57 @@
   .quiz-expl.show { display: block; }
   .quiz-expl.bad { color: var(--err); }
   .cards-toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
-  .cards-toolbar select { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
-  button.small { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; }
-  button.small:disabled { opacity: .45; cursor: not-allowed; }
-
+  .cards-toolbar select { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-weight: 600; }
+  .btn-format { border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-format.reels { background: linear-gradient(135deg, #ec4899, #8b5cf6); color: #fff; }
+  .btn-format.carousel { background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; }
+  .btn-format.primary { background: var(--accent); color: #fff; }
 </style>
 </head>
 <body>
+
+<header class="header">
+  <a href="/" class="brand">
+    <div class="brand-badge">⚡</div>
+    <span>Eklavya</span>
+  </a>
+  <nav class="nav-pills">
+    <a href="/" class="nav-pill active">📄 Ingest &amp; Tutor</a>
+    <a href="#cards" class="nav-pill">📌 Post Cards</a>
+    <a href="/carousel.html" class="nav-pill">🎠 Carousel (PPT)</a>
+    <a href="/reels.html" class="nav-pill">🎬 Reels (30–60s)</a>
+  </nav>
+</header>
+
 <div class="wrap">
-  <h1>📄 Eklavya — PDF Ingest Tester</h1>
-  <div class="sub">Upload a PDF and watch it go through <code>MuPDF → OCR fallback → chunking</code>. Endpoint: <code>POST /api/ingest/pdf</code></div>
+  <h1>🚀 Universal Ingest &amp; Multi-Format Content Studio</h1>
+  <div class="sub">
+    Upload a <strong>PDF</strong> (MuPDF / OCR) or <strong>Video / Audio</strong> (Whisper) to generate <strong>30–60s Vertical Reels</strong>, <strong>Carousel Presentation Decks</strong>, <strong>Post Cards</strong>, and <strong>Grounded AI Tutor RAG</strong>.
+  </div>
 
   <div class="card">
+    <h2>📤 Ingest Material (PDF, MP4, MOV, WebM, MP3)</h2>
     <div id="dropzone">
-      <div class="icon">🗂️</div>
-      <div><strong>Drop a PDF here</strong> or click to choose a file</div>
-      <div class="hint">Only .pdf files are accepted (max 500 MB)</div>
-      <input type="file" id="fileInput" accept=".pdf,application/pdf" />
+      <div class="icon">📁</div>
+      <div><strong>Drop a PDF or Video/Audio file here</strong> or click to browse</div>
+      <div class="hint">Supported: .pdf, .mp4, .mov, .webm, .mkv, .mp3, .wav, .m4a (max 500 MB)</div>
+      <input type="file" id="fileInput" accept=".pdf,.mp4,.mov,.webm,.mkv,.avi,.mp3,.wav,.m4a,application/pdf,video/*,audio/*" />
     </div>
     <div id="fileBadge">
-      <span>📄</span>
+      <span id="fileIcon">📄</span>
       <span class="name" id="fileName"></span>
       <span class="size" id="fileSize"></span>
       <button class="clear" id="fileClear" title="Remove">✕</button>
     </div>
 
-    <label class="cfg">API base URL (leave empty if the backend serves this page)
+    <label class="cfg">API base URL (leave empty if served from the backend)
       <input id="apiBase" value="" placeholder="http://localhost:3000" />
     </label>
 
     <div class="actions">
-      <button class="primary" id="uploadBtn" disabled>Upload &amp; Ingest</button>
+      <button class="primary" id="uploadBtn" disabled>Upload &amp; Process</button>
+      <a href="/reels.html" class="btn-format reels" id="directReelsLink">🎬 Go to 30–60s Reels Studio</a>
+      <a href="/carousel.html" class="btn-format carousel" id="directCarouselLink">🎠 Go to Carousel Deck</a>
       <span class="status" id="status"></span>
     </div>
     <div class="bar" id="bar"><div></div></div>
@@ -121,12 +159,12 @@
   <!-- RAG / AI Tutor -->
   <div class="card">
     <h2>🤖 Ask the AI Tutor (RAG)</h2>
-    <div class="sub" style="margin-bottom:14px">Answers are grounded in the chunks indexed from your uploads. <span id="kbStats" class="status"></span></div>
+    <div class="sub" style="margin-bottom:14px">Instant grounded answers from your uploaded PDFs and Video transcripts. <span id="kbStats" class="status"></span></div>
     <div style="display:flex; gap:12px">
-      <input id="questionInput" placeholder="e.g. Explain binary search" style="flex:1; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:12px 14px; font-size:14px" />
+      <input id="questionInput" placeholder="e.g. Explain how binary search works" style="flex:1; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:10px; padding:12px 14px; font-size:14px" />
       <button class="primary" id="askBtn">Ask</button>
     </div>
-    <div style="margin-top:10px; font-size:13px; color:var(--muted)">Ask about:
+    <div style="margin-top:10px; font-size:13px; color:var(--muted)">Search scope:
       <select id="sourceSelect" style="margin-left:6px; background:var(--panel-2); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:6px 10px; font-size:13px">
         <option value="">All materials</option>
       </select>
@@ -140,10 +178,10 @@
     </div>
   </div>
 
-  <!-- Post Cards (AI Content Engine) -->
-  <div class="card">
-    <h2>📚 Post Cards</h2>
-    <div class="sub" style="margin-bottom:12px">Whole-chapter mode splits every big topic into multiple ordered cards — one card per section, with interactive quizzes.</div>
+  <!-- Post Cards & Format Engine -->
+  <div class="card" id="cards">
+    <h2>📚 Content Cards &amp; Multi-Format Outputs</h2>
+    <div class="sub" style="margin-bottom:12px">Split materials into structured section cards, PPT Carousel slide decks, and vertical 30–60s Reels.</div>
     <div class="cards-toolbar">
       <span style="font-size:13px;color:var(--muted)">File:</span>
       <select id="cardsSourceSelect"><option value="">All files</option></select>
@@ -152,8 +190,9 @@
         <option value="2">Whole chapter (more cards)</option>
         <option value="1">1 card per topic</option>
       </select>
-            <button class="small" id="genCardsBtn">✨ Generate cards</button>
-      <a href="carousel.html" class="small" id="carouselLink" style="background:var(--warn);text-decoration:none;">🎠 Carousel view</a>
+      <button class="btn-format primary" id="genCardsBtn">✨ Generate cards</button>
+      <a href="carousel.html" class="btn-format carousel" id="carouselLink">🎠 Carousel Slides</a>
+      <a href="reels.html" class="btn-format reels" id="reelsLink">🎬 30–60s Reels</a>
       <span class="status" id="cardsStatus"></span>
     </div>
     <div id="cardsError" class="errbox hidden"></div>
@@ -162,15 +201,15 @@
 
   <div id="results" class="hidden">
     <div class="card">
-      <h2>📊 Stats</h2>
+      <h2>📊 Extraction Stats</h2>
       <div class="stats">
-        <div class="stat"><div class="val" id="statPages">—</div><div class="lbl">Pages extracted</div></div>
-        <div class="stat"><div class="val" id="statChunks">—</div><div class="lbl">Chunks produced</div></div>
-        <div class="stat"><div class="val" id="statOcr"><span class="pill mupdf">—</span></div><div class="lbl">Extraction method</div></div>
+        <div class="stat"><div class="val" id="statUnits">—</div><div class="lbl" id="statUnitsLbl">Pages / Duration</div></div>
+        <div class="stat"><div class="val" id="statChunks">—</div><div class="lbl">Chunks indexed</div></div>
+        <div class="stat"><div class="val" id="statMethod"><span class="pill mupdf">—</span></div><div class="lbl">Pipeline engine</div></div>
       </div>
     </div>
     <div class="card">
-      <h2>🧩 Chunks <span class="status" id="chunkCount"></span></h2>
+      <h2>🧩 Extracted Chunks &amp; Transcripts <span class="status" id="chunkCount"></span></h2>
       <div id="chunkList"></div>
     </div>
     <div class="card">
@@ -179,10 +218,12 @@
     </div>
   </div>
 </div>
+
 <script>
 const dropzone  = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
 const fileBadge = document.getElementById('fileBadge');
+const fileIcon  = document.getElementById('fileIcon');
 const fileName  = document.getElementById('fileName');
 const fileSize  = document.getElementById('fileSize');
 const fileClear = document.getElementById('fileClear');
@@ -209,15 +250,17 @@ fileClear.addEventListener('click', () => setFile(null));
 
 function setFile(f) {
   errorBox.classList.add('hidden');
-  if (f && !f.name.toLowerCase().endsWith('.pdf')) {
-    showError('Only .pdf files are accepted.');
-    f = null;
-  }
   selectedFile = f || null;
   fileBadge.classList.toggle('show', !!selectedFile);
   if (selectedFile) {
     fileName.textContent = selectedFile.name;
     fileSize.textContent = formatBytes(selectedFile.size);
+    const isVid = /\.(mp4|mov|webm|mkv|avi|mp3|wav|m4a)$/i.test(selectedFile.name);
+    fileIcon.textContent = isVid ? '🎬' : '📄';
+
+    // Update direct links
+    document.getElementById('directReelsLink').href = `/reels.html?source=${encodeURIComponent(selectedFile.name)}`;
+    document.getElementById('directCarouselLink').href = `/carousel.html?source=${encodeURIComponent(selectedFile.name)}`;
   }
   uploadBtn.disabled = !selectedFile;
   resetStatus();
@@ -235,11 +278,12 @@ uploadBtn.addEventListener('click', doUpload);
 async function doUpload() {
   if (!selectedFile) return;
   const base = (apiBase.value || window.location.origin).replace(/\/+$/, '');
-  const url = base + '/api/ingest/pdf';
+  const isVideo = /\.(mp4|mov|webm|mkv|avi|mp3|wav|m4a)$/i.test(selectedFile.name);
+  const url = base + (isVideo ? '/api/ingest/video' : '/api/ingest/pdf');
 
   uploadBtn.disabled = true;
   resetStatus();
-  setStatus('Uploading & processing… this can take a while if OCR kicks in.', '');
+  setStatus(isVideo ? 'Transcribing video & preparing 30–60s reels…' : 'Uploading & processing PDF…', '');
   bar.classList.add('show');
   results.classList.add('hidden');
 
@@ -255,21 +299,17 @@ async function doUpload() {
       throw new Error(msg);
     }
     render(data);
-    setStatus('✅ Done — ' + data.stats.chunks + ' chunks from ' + data.stats.pages + ' pages.', 'ok');
-    // Your file is now in the knowledge base — refresh both file pickers and
-    // the cards grid, then watch for the background card generation.
+    setStatus('✅ Done — ' + data.stats.chunks + ' chunks indexed.', 'ok');
     refreshKbStats();
     loadCards();
     pollCards();
 
-    // Auto-select the just-uploaded file in the Post Cards toolbar so
-    // "Generate cards" (if the auto-run hasn't already finished) targets it.
     if (data.fileName) {
       cardsSourceSelect.value = data.fileName;
+      updateToolbarLinks(data.fileName);
     }
   } catch (err) {
-    showError('Ingestion failed:\n' + (err.message || err) +
-      '\n\nIs the backend running? (npm run dev — then open http://localhost:3000)');
+    showError('Ingestion failed:\n' + (err.message || err));
     setStatus('Failed.', 'err');
   } finally {
     bar.classList.remove('show');
@@ -280,12 +320,21 @@ async function doUpload() {
 // ---- rendering ----
 function render(data) {
   results.classList.remove('hidden');
-  document.getElementById('statPages').textContent  = data.stats.pages;
+  const isVid = data.type === 'video';
+  document.getElementById('statUnits').textContent = isVid
+    ? (data.stats.durationSec ? Math.round(data.stats.durationSec) + 's' : 'Audio')
+    : (data.stats.pages || '—');
+  document.getElementById('statUnitsLbl').textContent = isVid ? 'Duration' : 'Pages extracted';
   document.getElementById('statChunks').textContent = data.stats.chunks;
-  const ocrEl = document.getElementById('statOcr');
-  ocrEl.innerHTML = data.stats.ocrUsed
-    ? '<span class="pill ocr">OCR used</span>'
-    : '<span class="pill mupdf">MuPDF text</span>';
+  const methodEl = document.getElementById('statMethod');
+  if (isVid) {
+    methodEl.innerHTML = '<span class="pill whisper">Whisper Speech-to-Text</span>';
+  } else {
+    methodEl.innerHTML = data.stats.ocrUsed
+      ? '<span class="pill ocr">OCR used</span>'
+      : '<span class="pill mupdf">MuPDF text</span>';
+  }
+
   document.getElementById('chunkCount').textContent = '(' + data.chunks.length + ')';
   document.getElementById('rawJson').value = JSON.stringify(data, null, 2);
 
@@ -294,11 +343,9 @@ function render(data) {
   data.chunks.forEach((c, i) => {
     const det = document.createElement('details');
     det.className = 'chunk';
-
     const metaBits = [];
-    if (c.meta.page != null) {
-      metaBits.push('page ' + c.meta.page + (c.meta.pageEnd && c.meta.pageEnd !== c.meta.page ? '–' + c.meta.pageEnd : ''));
-    }
+    if (c.meta.page != null) metaBits.push('page ' + c.meta.page);
+    if (c.meta.startSec != null) metaBits.push(fmtTime(c.meta.startSec) + '–' + fmtTime(c.meta.endSec));
     if (c.meta.extraction) metaBits.push(c.meta.extraction);
 
     const sum = document.createElement('summary');
@@ -315,13 +362,14 @@ function render(data) {
     det.appendChild(body);
     list.appendChild(det);
   });
-  if (!data.chunks.length) {
-    list.innerHTML = '<div class="status">No chunks were produced — the PDF may be empty or unreadable.</div>';
-  }
   results.scrollIntoView({ behavior: 'smooth' });
 }
 
-// ---- helpers ----
+function fmtTime(sec) {
+  if (sec == null || isNaN(sec)) return '0:00';
+  return Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0');
+}
+
 function setStatus(msg, cls) { statusEl.textContent = msg; statusEl.className = 'status ' + (cls || ''); }
 function resetStatus() { setStatus('', ''); }
 function showError(msg) { errorBox.textContent = msg; errorBox.classList.remove('hidden'); }
@@ -341,7 +389,6 @@ const sourceList = document.getElementById('sourceList');
 const kbStats = document.getElementById('kbStats');
 
 refreshKbStats();
-
 askBtn.addEventListener('click', doAsk);
 questionInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doAsk(); });
 
@@ -357,7 +404,6 @@ async function refreshKbStats() {
   } catch { /* stats are optional */ }
 }
 
-/** Fill both file pickers (Ask panel + Post Cards toolbar) with uploaded files. */
 function syncSourceDropdowns(sourceNames) {
   [
     { sel: document.getElementById('sourceSelect'), allLabel: 'All materials' },
@@ -371,7 +417,6 @@ function syncSourceDropdowns(sourceNames) {
       opt.textContent = name;
       sel.appendChild(opt);
     });
-    // Prefer keeping the previous selection if it still exists
     if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
   });
 }
@@ -384,7 +429,7 @@ async function doAsk() {
   askBtn.disabled = true;
   askError.classList.add('hidden');
   answerBox.classList.add('hidden');
-  setStatus('Thinking… (first question is slower: the embedding model loads once)', '');
+  setStatus('Thinking… (embedding query and generating grounded answer)', '');
 
   try {
     const res = await fetch(base + '/api/ask', {
@@ -402,8 +447,8 @@ async function doAsk() {
     answerText.textContent = data.answer;
     sourceList.innerHTML = '';
     data.sources.forEach((s, i) => {
-      const loc = [s.source, s.page != null ? ('page ' + s.page + (s.pageEnd ? '-' + s.pageEnd : '')) : null,
-        s.startSec != null ? (fmtTime(s.startSec) + '-' + (s.endSec != null ? fmtTime(s.endSec) : '?')) : null]
+      const loc = [s.source, s.page != null ? ('page ' + s.page) : null,
+        s.startSec != null ? (fmtTime(s.startSec) + '–' + fmtTime(s.endSec)) : null]
         .filter(Boolean).join(' · ');
       const det = document.createElement('details');
       det.className = 'chunk';
@@ -426,11 +471,7 @@ async function doAsk() {
   }
 }
 
-function fmtTime(sec) {
-  return Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0');
-}
-
-// ---- Post Cards (AI Content Engine) ----
+// ---- Post Cards & Multi-Format Outputs ----
 const cardsSourceSelect = document.getElementById('cardsSourceSelect');
 const genCardsBtn = document.getElementById('genCardsBtn');
 const cardsStatus = document.getElementById('cardsStatus');
@@ -438,24 +479,25 @@ const cardsError = document.getElementById('cardsError');
 const cardsGrid = document.getElementById('cardsGrid');
 
 genCardsBtn.addEventListener('click', generateCards);
-cardsSourceSelect.addEventListener('change', loadCards);
-cardsSourceSelect.addEventListener('change', function() {
-  const src = cardsSourceSelect.value;
-  const link = document.getElementById('carouselLink');
-  link.href = 'carousel.html' + (src ? '?source=' + encodeURIComponent(src) : '');
+cardsSourceSelect.addEventListener('change', () => {
+  loadCards();
+  updateToolbarLinks(cardsSourceSelect.value);
 });
+
+function updateToolbarLinks(src) {
+  const cLink = document.getElementById('carouselLink');
+  const rLink = document.getElementById('reelsLink');
+  cLink.href = 'carousel.html' + (src ? '?source=' + encodeURIComponent(src) : '');
+  rLink.href = 'reels.html' + (src ? '?source=' + encodeURIComponent(src) : '');
+}
+
 loadCards();
 
-/**
- * Repeatedly reload the cards grid so cards generated in the background
- * (right after an upload) appear without a manual page refresh.
- */
 function pollCards(checksLeft = 8) {
   if (checksLeft <= 0) return;
   const src = cardsSourceSelect.value;
   setTimeout(async () => {
     await loadCards();
-    // Stop polling once this file actually has cards
     try {
       const base = (apiBase.value || window.location.origin).replace(/\/+$/, '');
       const res = await fetch(base + '/api/cards' + (src ? '?source=' + encodeURIComponent(src) : ''));
@@ -473,23 +515,21 @@ async function loadCards() {
     const res = await fetch(base + '/api/cards' + (src ? '?source=' + encodeURIComponent(src) : ''));
     const data = await res.json();
     renderCards(data.cards || []);
-  } catch { /* grid just stays as-is */ }
+  } catch { /* grid stays */ }
 }
 
 async function generateCards() {
   const base = (apiBase.value || window.location.origin).replace(/\/+$/, '');
   const src = cardsSourceSelect.value;
   if (!src) {
-    cardsError.textContent = 'Pick a file first — cards are generated per upload.';
+    cardsError.textContent = 'Pick a file first.';
     cardsError.classList.remove('hidden');
     return;
   }
   genCardsBtn.disabled = true;
   cardsError.classList.add('hidden');
   cardsStatus.className = 'status';
-  cardsStatus.textContent = document.getElementById('cardsDepthSelect').value === '2'
-    ? '🧠 Generating whole chapter… one card per section. Big files take a few minutes.'
-    : '🧠 Generating one card per topic… this can take 1–3 minutes.';
+  cardsStatus.textContent = '🧠 Generating cards… this can take 1–3 minutes.';
 
   try {
     const res = await fetch(base + '/api/cards/generate', {
@@ -498,9 +538,7 @@ async function generateCards() {
       body: JSON.stringify({ source: src, depth: Number(document.getElementById('cardsDepthSelect').value) }),
     });
     const data = await res.json().catch(() => null);
-    if (!res.ok || !data || data.ok !== true) {
-      throw new Error((data && data.error) || ('HTTP ' + res.status));
-    }
+    if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || ('HTTP ' + res.status));
     renderCards(data.cards);
     cardsStatus.className = 'status ok';
     cardsStatus.textContent = '✅ ' + data.cards.length + ' cards ready.';
@@ -516,7 +554,7 @@ async function generateCards() {
 function renderCards(cards) {
   cardsGrid.innerHTML = '';
   if (!cards.length) {
-    cardsGrid.innerHTML = '<div class="status">No cards yet — generate them for one of your uploads.</div>';
+    cardsGrid.innerHTML = '<div class="status">No cards yet — click "Generate cards" or upload a file.</div>';
     return;
   }
   cards.forEach((card) => {
@@ -588,10 +626,6 @@ function renderQuiz(q) {
   wrap.appendChild(expl);
   return wrap;
 }
-
-
 </script>
-
 </body>
 </html>
-

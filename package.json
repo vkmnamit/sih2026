@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "test": "npm run build && tsx tests/run-tests.ts",
+    "test:reels": "npm run build && tsx tests/run-reels-test.ts",
     "fixtures": "tsx tests/make-fixtures.ts",
     "test:content": "npm run build && tsx tests/run-linkedin-test.ts"
   },

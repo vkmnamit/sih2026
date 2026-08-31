@@ -1,0 +1,730 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Eklavya — 30–60s Video Reels</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07090e;
+  --surface: #11141e;
+  --surface-glass: rgba(17, 20, 30, 0.75);
+  --border: rgba(255, 255, 255, 0.1);
+  --border-active: rgba(120, 119, 255, 0.4);
+  --text: #f0f3fa;
+  --muted: #949db3;
+  --accent: #6366f1;
+  --accent-glow: rgba(99, 102, 241, 0.35);
+  --accent-2: #ec4899;
+  --accent-3: #10b981;
+  --yellow: #f59e0b;
+  --radius: 18px;
+  --radius-sm: 10px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Header & Global Nav */
+.header {
+  width: 100%;
+  max-width: 1200px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  z-index: 50;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.5px;
+  color: #fff;
+  text-decoration: none;
+}
+.brand-badge {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+.nav-pills {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 4px;
+  border-radius: 99px;
+  gap: 4px;
+}
+.nav-pill {
+  padding: 7px 15px;
+  border-radius: 99px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.nav-pill:hover { color: var(--text); }
+.nav-pill.active {
+  background: linear-gradient(135deg, var(--accent), #4f46e5);
+  color: #fff;
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+/* Studio Toolbar */
+.studio-bar {
+  width: 100%;
+  max-width: 900px;
+  padding: 12px 18px;
+  background: var(--surface-glass);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius);
+  margin-bottom: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+.bar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 220px;
+}
+.bar-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+select.custom-select {
+  width: 100%;
+  background: #171b29;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+select.custom-select:focus { border-color: var(--accent); }
+
+.gen-btn {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: transform 0.15s, opacity 0.2s;
+  box-shadow: 0 4px 14px var(--accent-glow);
+  white-space: nowrap;
+}
+.gen-btn:hover { transform: translateY(-1px); }
+.gen-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.status-pill {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.status-pill.ready { border-color: var(--accent-3); color: var(--accent-3); background: rgba(16,185,129,0.1); }
+.status-pill.generating { border-color: var(--yellow); color: var(--yellow); background: rgba(245,158,11,0.1); }
+
+/* Main Stage Container */
+.stage-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 900px;
+  margin-bottom: 24px;
+}
+
+/* 9:16 Vertical Reel Player */
+.reel-viewport {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 9 / 16;
+  background: #000;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--border);
+  touch-action: pan-x;
+}
+
+/* Background video blur canvas */
+.blur-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(28px) brightness(0.4);
+  transform: scale(1.15);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Main Foreground Video */
+.main-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 2;
+  cursor: pointer;
+}
+
+/* Overlay Gradients */
+.top-scrim {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 120px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, transparent 100%);
+  pointer-events: none;
+  z-index: 5;
+}
+.bottom-scrim {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 220px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.6) 60%, transparent 100%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Top Reel Meta */
+.top-meta {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  right: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+}
+.reel-badge {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 5px 12px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.reel-badge .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: pulse 1.6s infinite ease-in-out;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+.duration-pill {
+  background: rgba(255,255,255,0.12);
+  backdrop-filter: blur(10px);
+  padding: 5px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #f3f4f6;
+}
+
+/* Play/Pause state icon overlay */
+.play-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 15;
+}
+.play-pulse.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+/* Live Synced Captions Overlay */
+.captions-box {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 125px;
+  z-index: 10;
+  text-align: center;
+  pointer-events: none;
+}
+.caption-text {
+  display: inline-block;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 8px 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.4;
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+  max-width: 100%;
+}
+.caption-text .highlight {
+  color: var(--yellow);
+  background: rgba(245, 158, 11, 0.15);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+/* Bottom Reel Content */
+.bottom-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 18px 20px 22px;
+  z-index: 10;
+}
+.hook-title {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #ffffff;
+  margin-bottom: 6px;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.7);
+  letter-spacing: -0.3px;
+}
+.hook-desc {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #d1d5db;
+  margin-bottom: 10px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tags-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.tag-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.18);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* Scrub Progress Bar */
+.progress-bar-wrap {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 99px;
+  cursor: pointer;
+  position: relative;
+}
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  border-radius: 99px;
+  position: relative;
+}
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  top: -3px;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(0,0,0,0.5);
+}
+
+/* Vertical Action Bar (Right Side) */
+.action-column {
+  position: absolute;
+  right: 14px;
+  bottom: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  z-index: 15;
+}
+.action-btn {
+  background: rgba(20, 24, 38, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.15);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s, color 0.2s;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.action-btn:hover { transform: scale(1.1); background: rgba(255,255,255,0.2); }
+.action-btn.liked { color: #f43f5e; border-color: #f43f5e; }
+.action-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2px;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Reel Chapter Selector Strip (Left / Outside on Desktop) */
+.reel-chapters-sidebar {
+  position: absolute;
+  right: calc(100% + 24px);
+  top: 0;
+  bottom: 0;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+.chapter-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+.chapter-card:hover { border-color: var(--accent); background: #171b29; }
+.chapter-card.active {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(236, 72, 153, 0.08));
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+.chapter-num {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+.chapter-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.chapter-time {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* Modal Bottom Sheets (Takeaway & Transcript) */
+.sheet-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sheet-modal.open { display: flex; }
+.sheet-content {
+  width: 100%;
+  max-width: 500px;
+  max-height: 80vh;
+  background: #131722;
+  border: 1px solid var(--border);
+  border-radius: 24px 24px 0 0;
+  padding: 24px 22px 34px;
+  overflow-y: auto;
+  box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.sheet-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sheet-close {
+  background: rgba(255,255,255,0.1);
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  font-size: 16px;
+}
+.sheet-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #cbd5e1;
+}
+.sheet-body pre {
+  white-space: pre-wrap;
+  font-family: inherit;
+  background: #1a2030;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 900px) {
+  .reel-chapters-sidebar { display: none; }
+  .header { padding: 12px 14px; }
+  .studio-bar { border-radius: 14px; }
+  .reel-viewport { max-width: 360px; }
+}
+@media (max-width: 480px) {
+  .reel-viewport { max-width: 100vw; aspect-ratio: 9 / 16; border-radius: 0; box-shadow: none; }
+  .header { flex-direction: column; gap: 10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <a href="/" class="brand">
+    <div class="brand-badge">⚡</div>
+    <span>Eklavya</span>
+  </a>
+  <nav class="nav-pills">
+    <a href="/" class="nav-pill">📄 Ingest &amp; Tutor</a>
+    <a href="/#cards" class="nav-pill">📌 Post Cards</a>
+    <a href="/carousel.html" class="nav-pill">🎠 Carousel (PPT)</a>
+    <a href="/reels.html" class="nav-pill active">🎬 Reels (30–60s)</a>
+  </nav>
+</header>
+
+<!-- Studio Controls -->
+<div class="studio-bar">
+  <div class="bar-group">
+    <span class="bar-label">Source Video:</span>
+    <select id="sourceSelect" class="custom-select">
+      <option value="">Loading videos...</option>
+    </select>
+  </div>
+  <div class="bar-group" style="max-width: 160px;">
+    <span class="bar-label">Clip Target:</span>
+    <select id="durationSelect" class="custom-select">
+      <option value="45" selected>45s (Reel)</option>
+      <option value="30">30s (Short)</option>
+      <option value="60">60s (Full)</option>
+    </select>
+  </div>
+  <button id="genReelsBtn" class="gen-btn" disabled>
+    <span>⚡ Generate 30–60s Reels</span>
+  </button>
+  <div id="statusBadge" class="status-pill">
+    <span>Ready</span>
+  </div>
+</div>
+
+<!-- Main Reel Stage -->
+<div class="stage-wrap">
+  <!-- Sidebar Chapters for Desktop -->
+  <div class="reel-chapters-sidebar" id="chaptersSidebar"></div>
+
+  <!-- 9:16 Vertical Reel Player -->
+  <div class="reel-viewport" id="viewport">
+    <!-- Blurred Backdrop for aesthetic ambient glow -->
+    <video id="blurVideo" class="blur-bg" muted loop playsinline></video>
+
+    <!-- Foreground Video Clip -->
+    <video id="mainVideo" class="main-video" playsinline></video>
+
+    <!-- Scrim Gradients -->
+    <div class="top-scrim"></div>
+    <div class="bottom-scrim"></div>
+
+    <!-- Top Overlay -->
+    <div class="top-meta">
+      <div class="reel-badge">
+        <div class="dot"></div>
+        <span id="reelCountBadge">Reel 1 of 5</span>
+      </div>
+      <div class="duration-pill" id="timeRangePill">⏱️ 0:00 – 0:45</div>
+    </div>
+
+    <!-- Play/Pause Pulse Icon -->
+    <div class="play-pulse" id="playPulse">▶</div>
+
+    <!-- Synced Live Subtitle Captions Overlay -->
+    <div class="captions-box">
+      <div class="caption-text" id="captionText">Ready to learn</div>
+    </div>
+
+    <!-- Bottom Metadata -->
+    <div class="bottom-content">
+      <div class="tags-row" id="tagsRow">
+        <span class="tag-badge">#AIReels</span>
+        <span class="tag-badge">#Eklavya</span>
+        <span class="tag-badge">#LearnIn45s</span>
+      </div>
+      <h2 class="hook-title" id="hookTitle">Loading Reel Clip...</h2>
+      <p class="hook-desc" id="hookDesc">Turn long educational videos into bite-sized 30-60 second reels.</p>
+      
+      <!-- Progress Bar -->
+      <div class="progress-bar-wrap" id="progressBar">
+        <div class="progress-bar-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <!-- Right Side Vertical Action Column -->
+    <div class="action-column">
+      <div class="action-item">
+        <button class="action-btn" id="likeBtn">❤️</button>
+        <span class="action-label" id="likeCount">1.4k</span>
+      </div>
+      <div class="action-item">
+        <button class="action-btn" id="summaryBtn" title="AI Takeaway">💡</button>
+        <span class="action-label">Summary</span>
+      </div>
+      <div class="action-item">
+        <button class="action-btn" id="transcriptBtn" title="Full Transcript">📝</button>
+        <span class="action-label">Script</span>
+      </div>
+      <div class="action-item">
+        <button class="action-btn" id="muteBtn" title="Mute/Unmute">🔊</button>
+        <span class="action-label" id="muteLabel">Sound</span>
+      </div>
+      <div class="action-item">
+        <button class="action-btn" id="downloadBtn" title="Download Reel MP4">📥</button>
+        <span class="action-label">Save</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AI Summary Sheet Modal -->
+<div class="sheet-modal" id="summaryModal">
+  <div class="sheet-content">
+    <div class="sheet-header">
+      <div class="sheet-title">💡 Key Takeaway &amp; Hook</div>
+      <button class="sheet-close" id="closeSummary">✕</button>
+    </div>
+    <div class="sheet-body">
+      <h3 id="modalHookTitle" style="color:#fff; margin-bottom:10px; font-size:16px;"></h3>
+      <p id="modalSummaryText" style="margin-bottom:14px;"></p>
+      <div id="modalTimestampText" style="font-size:12px; color:var(--muted);"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Transcript Sheet Modal -->
+<div class="sheet-modal" id="transcriptModal">
+  <div class="sheet-content">
+    <div class="sheet-header">
+      <div class="sheet-title">📝 30–60s Clip Transcript</div>
+      <button class="sheet-close" id="closeTranscript">✕</button>
+    </div>
+    <div class="sheet-body">
+      <pre id="modalTranscriptText"></pre>
+    </div>
+  </div>
+</div>
+
+<script src="reels.js"></script>
+</body>
+</html>

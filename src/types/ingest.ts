@@ -191,6 +191,7 @@ export interface CarouselTakeaway {
  * timeline events, etc.).
  */
 export interface ContentCard {
+
   id: string;
   /** Uploaded file this card was generated from */
   source: string;
@@ -239,4 +240,53 @@ export interface CardsResponse {
   source: string | null;
   cards: ContentCard[];
 }
+
+
+// ------------------------------------------------------------------ reels
+
+/**
+ * One rendered vertical (9:16) reel cut from an uploaded video.
+ * Files are served statically at /reels/<safeSource>/<file>.
+ */
+export interface ReelInfo {
+  id: string;
+  /** Uploaded file this reel was cut from */
+  source: string;
+  /** Clip window within the original video */
+  startSec: number;
+  endSec: number;
+  /** Duration in seconds */
+  durationSec?: number;
+  /** Short hook/title shown over the reel */
+  title: string;
+  /** URL to the rendered mp4 (e.g. /reels/lecture_mp4/reel_0.mp4) */
+  fileUrl: string;
+  /** Original video source URL if available */
+  sourceVideoUrl?: string;
+  /** Text content/transcript for this reel window */
+  transcript?: string;
+  /** Summary or key takeaway for this reel */
+  summary?: string;
+  /** Subtitle cues with relative timestamps */
+  cues?: Array<{ startSec: number; endSec: number; text: string }>;
+  /** Render time */
+  generatedAt: string;
+}
+
+/** Per-source reel set + generation job status. */
+export interface ReelSet {
+  source: string;
+  status: 'idle' | 'generating' | 'ready' | 'failed';
+  error?: string;
+  videoAvailable: boolean;
+  durationSec?: number;
+  reels: ReelInfo[];
+}
+
+/** Response shape for GET /api/reels */
+export interface ReelsResponse {
+  ok: true;
+  sources: ReelSet[];
+}
+
 
