@@ -96,6 +96,38 @@ if (up) {
   });
   check('POST /api/reels/generate rejects empty source', badGen.status === 400);
 
+  // POST /api/reels/personalize validation
+  const badPers = await fetch(`http://localhost:${PORT}/api/reels/personalize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: 'lecture.mp3' }),
+  });
+  check('POST /api/reels/personalize rejects missing interests', badPers.status === 400);
+
+  // POST /api/reels/personalize happy path
+  const persRes = await fetch(`http://localhost:${PORT}/api/reels/personalize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source: 'lecture.mp3', interests: ['binary search'] }),
+  });
+  const persData = await persRes.json();
+  check('POST /api/reels/personalize returns a stitched reel job',
+    persRes.status === 200 && persData.ok === true && typeof persData.reelId === 'string');
+
+  if (persData.ok) {
+    // Poll up to 60s for the background FFmpeg stitch to finish
+    let forYou: { status?: string; video?: string } | undefined;
+    for (let i = 0; i < 30; i += 1) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const setRes = await fetch(`http://localhost:${PORT}/api/reels?source=lecture.mp3`);
+      const setData = await setRes.json();
+      forYou = (setData.reels ?? []).find((r: { personalized?: boolean }) => r.personalized);
+      if (forYou?.status === 'ready' || forYou?.status === 'failed') break;
+    }
+    check('Personalized reel appears in manifest', Boolean(forYou));
+    check('Personalized reel reaches ready status', forYou?.status === 'ready', `status=${forYou?.status}`);
+  }
+
   server.kill();
 }
 

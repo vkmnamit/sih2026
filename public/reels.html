@@ -760,6 +760,73 @@ select.custom-select:focus { border-color: var(--accent); }
   -webkit-box-orient: vertical;
 }
 .feed-time { font-size: 11px; color: var(--muted); margin-top: 5px; opacity: 0.85; }
+.feed-card.foryou { border-color: rgba(236, 72, 153, 0.45); }
+.feed-card.foryou.active { border-color: var(--accent-2); background: rgba(236, 72, 153, 0.1); }
+.feed-card.foryou .feed-num { background: linear-gradient(160deg, var(--accent-2), var(--yellow)); }
+
+/* For You personalized reel builder */
+.foryou-bar {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.08), rgba(99, 102, 241, 0.08));
+  border: 1px solid rgba(236, 72, 153, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.foryou-label { font-size: 13px; font-weight: 800; color: var(--accent-2); display: block; margin-bottom: 8px; }
+.foryou-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.foryou-chip {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 11px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.foryou-chip:hover { border-color: var(--border-active); color: var(--text); }
+.foryou-chip.selected {
+  background: linear-gradient(135deg, var(--accent-2), #be185d);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(236, 72, 153, 0.3);
+}
+.foryou-input-row { display: flex; gap: 8px; }
+.foryou-input {
+  flex: 1;
+  min-width: 0;
+  background: #171b29;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-family: inherit;
+  outline: none;
+}
+.foryou-input:focus { border-color: var(--accent-2); }
+.foryou-btn {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent-2), #be185d);
+  color: #fff;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+.foryou-btn:hover { opacity: 0.9; }
+.foryou-btn:disabled { opacity: 0.5; cursor: wait; }
+.foryou-hint { font-size: 10.5px; color: var(--muted); margin-top: 8px; opacity: 0.8; }
 
 /* Mobile Responsiveness */
 @media (max-width: 900px) {
@@ -909,6 +976,18 @@ select.custom-select:focus { border-color: var(--accent); }
     <span class="reels-feed-title">🎬 Reels Feed</span>
     <span class="reels-feed-count" id="reelsFeedCount"></span>
   </div>
+
+  <!-- Interest-based "For You" personalized reel builder -->
+  <div class="foryou-bar" id="foryouBar">
+    <span class="foryou-label">✨ For You</span>
+    <div class="foryou-chips" id="foryouChips"></div>
+    <div class="foryou-input-row">
+      <input type="text" id="foryouInput" class="foryou-input" placeholder="add an interest… (e.g. time complexity)" />
+      <button id="foryouBtn" class="foryou-btn">🎬 Create My Reel</button>
+    </div>
+    <div class="foryou-hint">Pick topics you care about — we'll stitch only those portions into one reel.</div>
+  </div>
+
   <div class="reels-feed" id="reelsFeed"></div>
 </div>
 

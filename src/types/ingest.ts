@@ -281,6 +281,12 @@ export interface ReelInfo {
   error?: string;
   /** Subtitle cues with relative timestamps */
   cues?: Array<{ startSec: number; endSec: number; text: string }>;
+  /** true when this reel was stitched for a specific student interest profile */
+  personalized?: boolean;
+  /** Interest profile used to select the segments (personalized reels only) */
+  interests?: string[];
+  /** Source timestamp map of the selected topic excerpts (personalized reels only) */
+  segments?: Array<{ start: number; end: number; title: string; score: number }>;
   /** Render time */
   generatedAt: string;
 }

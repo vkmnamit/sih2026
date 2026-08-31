@@ -45,6 +45,9 @@ export async function chatComplete(
         temperature,
         max_tokens: maxTokens,
       }),
+      // Hard timeout — a hung OpenRouter request must never stall a
+      // background pipeline (e.g. reel metadata generation) forever.
+      signal: AbortSignal.timeout(120_000),
     });
 
   // Free-tier models are often transiently rate-limited (429) or return an

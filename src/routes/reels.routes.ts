@@ -5,7 +5,7 @@
  *                              { "source": "lecture.mp4", "targetDurationSec"?: 30 | 45 | 60 }
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
-import { getReels, startReelGeneration, generateReelsForSource } from '../services/reel.service.js';
+import { getReels, startReelGeneration, generateReelsForSource, generatePersonalizedReel } from '../services/reel.service.js';
 import { HttpError } from '../middleware/validate.middleware.js';
 
 const router = Router();
@@ -71,6 +71,37 @@ router.post(
           status: 'processing',
         });
       }
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  '/personalize',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const source = typeof req.body?.source === 'string' ? req.body.source.trim() : '';
+      const interests = Array.isArray(req.body?.interests)
+        ? req.body.interests
+            .filter((x: unknown) => typeof x === 'string' && x.trim().length > 0)
+            .map((x: string) => x.trim())
+            .slice(0, 8)
+        : [];
+
+      if (!source) {
+        throw new HttpError(400, 'Body must include { "source": "video.mp4", "interests": ["binary search", ...] }');
+      }
+      if (interests.length === 0) {
+        throw new HttpError(400, 'Provide at least one interest, e.g. { "interests": ["time complexity"] }');
+      }
+
+      const result = await generatePersonalizedReel(source, interests);
+      if (!result) {
+        throw new HttpError(404, `No indexed sections found for "${source}". Generate reels first (POST /api/reels/generate).`);
+      }
+
+      res.json({ ok: true, source, interests, ...result });
     } catch (err) {
       next(err);
     }

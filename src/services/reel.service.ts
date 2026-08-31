@@ -22,11 +22,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config/index.js';
 import { getDocsBySource, search } from './vector-store.service.js';
-import { embedText } from './embedding.service.js';
+import { embedText, embedTexts } from './embedding.service.js';
 import { chatComplete } from './llm.service.js';
 import type { ReelInfo, ReelSet } from '../types/ingest.js';
 
 const MANIFEST_PATH = path.join(config.reelsDir, 'manifest.json');
+
+/** Sources with an active in-process generation (prevents duplicate runs). */
+const activeGenerations = new Set<string>();
 
 interface SubtitleCue {
   startSec: number;
@@ -222,19 +225,27 @@ async function llmTopicSegmentation(
             content: `Source: ${source}\nTotal duration: ~${totalMin} minutes\n\nTranscript:\n${windowText}`,
           },
         ],
-        { temperature: 0.2, maxTokens: 800 }
+        { temperature: 0.2, maxTokens: 2000 }
       );
 
       const match = raw.match(/\[[\s\S]*\]/);
       if (match) {
-        const parsed = JSON.parse(match[0]) as Array<{ title?: string; startSec?: number; endSec?: number }>;
-        const valid = parsed.filter(
-          (s) => typeof s.title === 'string' && typeof s.startSec === 'number' && typeof s.endSec === 'number'
-            && s.endSec > s.startSec
-        );
-        if (valid.length >= 1) {
-          allBoundaries.push(...(valid as Array<{ title: string; startSec: number; endSec: number }>));
+        try {
+          const parsed = JSON.parse(match[0]) as Array<{ title?: string; startSec?: number; endSec?: number }>;
+          const valid = parsed.filter(
+            (s) => typeof s.title === 'string' && typeof s.startSec === 'number' && typeof s.endSec === 'number'
+              && s.endSec > s.startSec
+          );
+          if (valid.length >= 1) {
+            allBoundaries.push(...(valid as Array<{ title: string; startSec: number; endSec: number }>));
+          } else {
+            console.warn(`[reels] LLM segmentation: response JSON had no valid boundaries for "${source}"`);
+          }
+        } catch (parseErr) {
+          console.warn(`[reels] LLM segmentation: JSON parse failed for "${source}":`, (parseErr as Error).message);
         }
+      } else {
+        console.warn(`[reels] LLM segmentation: no JSON array in LLM response for "${source}" (first 200 chars: ${raw.slice(0, 200)})`);
       }
     } catch (err) {
       console.warn('[reels] LLM topic segmentation call failed:', (err as Error).message);
@@ -383,7 +394,24 @@ function splitOverlong(
   maxSec: number,
   minSec: number,
 ): Array<SectionWindow & { llmTitle: string }> {
-  if (win.duration <= maxSec || win.cues.length < 2) return [win];
+  if (win.duration <= maxSec) return [win];
+
+  // A single long Whisper cue (chunker merged several sentences into one
+  // chunk) cannot be split by cue boundaries — synthesize sub-cues by
+  // splitting the text into sentences with time allocated proportionally.
+  if (win.cues.length < 2) {
+    const sentences = win.text.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+    if (sentences.length < 2) return [win];
+    const totalChars = sentences.reduce((s, x) => s + x.length, 0);
+    let t = win.start;
+    const subCues: SubtitleCue[] = sentences.map((s) => {
+      const d = (s.length / totalChars) * win.duration;
+      const cue = { startSec: Math.round(t * 100) / 100, endSec: Math.round((t + d) * 100) / 100, text: s };
+      t += d;
+      return cue;
+    });
+    return splitOverlong({ ...win, cues: subCues }, allCues, maxSec, minSec);
+  }
 
   const mid = win.start + win.duration / 2;
   // Find sentence-ending cue closest to midpoint
@@ -705,6 +733,239 @@ async function renderReel(
   await runFfmpeg(ffmpegArgs, outDir);
 }
 
+// ──────────────────────────────── interest-based personalized reels ──────────
+
+interface RankedSection {
+  index: number;
+  score: number;
+}
+
+/**
+ * Rank a source's semantic sections against a student's interest profile.
+ *
+ * The content AI decides *what is taught* in each section (Stage 1 titles +
+ * takeaways + transcript); this scorer decides *which sections are relevant
+ * to this student*. Future ML recommenders can replace the scoring body —
+ * the interface (sections + interests → ranked indexes) stays the same.
+ *
+ * score = 0.85 · max cosine(interest, section) + 0.15 · keyword overlap
+ */
+async function rankSectionsByInterest(
+  sections: ReelInfo[],
+  interests: string[]
+): Promise<RankedSection[]> {
+  const clean = interests.map((i) => i.trim()).filter(Boolean);
+  if (sections.length === 0) return [];
+  if (clean.length === 0) {
+    return sections.map((_, i) => ({ index: i, score: 0.5 }));
+  }
+
+  const sectionTexts = sections.map(
+    (r) => `${r.title}. ${(r.takeaways ?? []).join(' ')} ${r.transcript ?? ''}`.slice(0, 1200)
+  );
+  const vectors = await embedTexts([...clean, ...sectionTexts]);
+  const interestVecs = vectors.slice(0, clean.length);
+  const sectionVecs = vectors.slice(clean.length);
+
+  return sectionVecs.map((sv, i) => {
+    let bestCos = -1;
+    for (const iv of interestVecs) {
+      let dot = 0;
+      const dims = Math.min(iv.length, sv.length);
+      for (let d = 0; d < dims; d += 1) dot += iv[d] * sv[d];
+      if (dot > bestCos) bestCos = dot;
+    }
+    const hay = `${sections[i].title} ${sections[i].transcript}`.toLowerCase();
+    let kwHits = 0;
+    for (const interest of clean) {
+      const words = interest.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
+      if (words.some((w) => hay.includes(w))) kwHits += 1;
+    }
+    const kwScore = kwHits / clean.length;
+    return { index: i, score: Math.max(0, Math.min(1, 0.85 * bestCos + 0.15 * kwScore)) };
+  });
+}
+
+export interface PersonalizeOptions {
+  /** Total stitched reel length cap in seconds (default 90) */
+  maxTotalSec?: number;
+  /** Per-topic excerpt cap in seconds (default 40) */
+  maxSegmentSec?: number;
+}
+
+/**
+ * Build ONE personalized "For You" reel that stitches the most relevant
+ * topic excerpts of a lecture for a given interest profile.
+ *
+ *   student interests → rank semantic sections → pick timestamp ranges
+ *   → render each excerpt 9:16 → FFmpeg concat → 🎬 single MP4
+ *
+ * The original video is never physically pre-cut; only timestamp ranges
+ * are rendered at request time.
+ */
+export async function generatePersonalizedReel(
+  source: string,
+  interests: string[],
+  options: PersonalizeOptions = {}
+): Promise<{ reelId: string; sectionsUsed: number; totalSec: number } | null> {
+  const manifest = loadManifest();
+  const entryKey = Object.keys(manifest).find((k) => k === source || safeName(k) === safeName(source));
+  if (!entryKey) return null;
+  const entry = manifest[entryKey];
+  if (!entry || entry.reels.length === 0) return null;
+  const videoPath = entry.videoPath;
+  if (!fs.existsSync(videoPath)) return null;
+
+  const safe = safeName(entryKey);
+  const outDir = path.join(config.reelsDir, safe);
+  fs.mkdirSync(outDir, { recursive: true });
+
+  const maxTotalSec = options.maxTotalSec ?? 90;
+  const maxSegmentSec = options.maxSegmentSec ?? 40;
+
+  // 1. Rank the base (non-personalized) sections against the interest profile
+  const baseReels = entry.reels.filter((r) => !r.personalized);
+  const ranked = await rankSectionsByInterest(baseReels, interests);
+  ranked.sort((a, b) => b.score - a.score);
+
+  // 2. Greedily pick the best excerpts until the length cap is reached.
+  //    Each excerpt is trimmed at the nearest cue boundary (never mid-sentence).
+  const picked: Array<{ start: number; end: number; title: string; score: number; cues: SubtitleCue[]; text: string }> = [];
+  let totalSec = 0;
+
+  for (const { index, score } of ranked) {
+    const r = baseReels[index];
+    const cues: SubtitleCue[] = (r.cues ?? []).filter(
+      (c) => c.endSec > r.start && c.startSec < r.end
+    );
+    let segEnd = Math.min(r.end, r.start + maxSegmentSec);
+    if (cues.length > 0) {
+      const cue = cues.find((c) => c.endSec >= segEnd) ?? cues[cues.length - 1];
+      segEnd = Math.min(r.end, Math.max(r.start + 5, cue.endSec));
+    }
+    const dur = segEnd - r.start;
+    if (dur < 5) continue;
+    if (picked.length > 0 && totalSec + dur > maxTotalSec) continue;
+
+    picked.push({
+      start: r.start,
+      end: segEnd,
+      title: r.title,
+      score,
+      cues: cues.length > 0 ? cues : [{ startSec: r.start, endSec: segEnd, text: r.transcript }],
+      text: r.transcript,
+    });
+    totalSec += dur;
+    if (totalSec >= maxTotalSec * 0.95) break;
+  }
+  if (picked.length === 0) return null;
+
+  // 3. Register the personalized reel in the manifest immediately so the
+  //    frontend can show a ⏳ card while FFmpeg stitches the segments.
+  const ts = Date.now();
+  const fileBase = `for_you_${ts}`;
+  const label = interests.filter(Boolean).slice(0, 3).join(' · ') || 'your interests';
+  const reel: ReelInfo = {
+    id: `${safe}#${fileBase}`,
+    source: entryKey,
+    start: 0,
+    end: totalSec,
+    duration: totalSec,
+    startSec: 0,
+    endSec: totalSec,
+    durationSec: totalSec,
+    title: `✨ For You: ${label}`,
+    video: `/reels/${safe}/${fileBase}.mp4`,
+    fileUrl: `/reels/${safe}/${fileBase}.mp4`,
+    captions: `/reels/${safe}/${fileBase}.srt`,
+    transcript: picked.map((p) => `— ${p.title} —\n${p.text}`).join('\n\n'),
+    takeaways: picked
+      .filter((p) => p.text.trim())
+      .map((p) => `${p.title}: ${p.text.split(/(?<=[.!?])\s/)[0]}`)
+      .slice(0, 6),
+    summary: `Personalized cut of "${entryKey}" stitched from ${picked.length} relevant topics for: ${label}.`,
+    status: 'processing',
+    cues: [],
+    personalized: true,
+    interests: interests.filter(Boolean),
+    segments: picked.map((p) => ({ start: p.start, end: p.end, title: p.title, score: Number(p.score.toFixed(3)) })),
+    generatedAt: new Date().toISOString(),
+  };
+  entry.reels.unshift(reel);
+  persistManifest(manifest);
+
+  // 4. Background: render each excerpt, concat, build merged SRT, cleanup.
+  void (async () => {
+    try {
+      const segFiles: string[] = [];
+      const mergedCues: SubtitleCue[] = [];
+      let offset = 0;
+
+      for (let i = 0; i < picked.length; i += 1) {
+        const seg = picked[i];
+        const segBase = `${fileBase}_seg${String(i + 1).padStart(2, '0')}`;
+        const segSrtRel = `${segBase}.srt`;
+        writeSrt(path.join(outDir, segSrtRel), seg.cues, seg.start);
+
+        const win: SectionWindow = {
+          start: seg.start,
+          end: seg.end,
+          duration: seg.end - seg.start,
+          text: seg.text,
+          cues: seg.cues,
+        };
+        await renderReel(videoPath, outDir, segBase, segSrtRel, win, seg.text.trim().length > 0);
+        segFiles.push(`${segBase}.mp4`);
+
+        for (const c of seg.cues) {
+          mergedCues.push({
+            startSec: Math.max(0, offset + (c.startSec - seg.start)),
+            endSec: Math.max(0.5, offset + (c.endSec - seg.start)),
+            text: c.text,
+          });
+        }
+        offset += seg.end - seg.start;
+        console.log(`[reels] personalized segment ${i + 1}/${picked.length} rendered (${seg.end - seg.start}s)`);
+      }
+
+      // Concat the excerpts (identical codec settings → stream copy)
+      const listPath = path.join(outDir, `${fileBase}.txt`);
+      fs.writeFileSync(listPath, segFiles.map((f) => `file '${f}'`).join('\n'), 'utf8');
+      await runFfmpeg(
+        ['-f', 'concat', '-safe', '0', '-i', `${fileBase}.txt`, '-c', 'copy', '-movflags', '+faststart', `${fileBase}.mp4`],
+        outDir
+      );
+
+      writeSrt(path.join(outDir, `${fileBase}.srt`), mergedCues, 0);
+
+      // Cleanup temp segment files
+      for (const f of segFiles) {
+        try { fs.unlinkSync(path.join(outDir, f)); } catch { /* ignore */ }
+        try { fs.unlinkSync(path.join(outDir, f.replace(/\.mp4$/, '.srt'))); } catch { /* ignore */ }
+      }
+      try { fs.unlinkSync(listPath); } catch { /* ignore */ }
+
+      reel.status = 'ready';
+      console.log(`[reels] personalized reel ready: ${reel.video} (${Math.round(totalSec)}s, ${picked.length} topics)`);
+    } catch (err) {
+      console.error('[reels] personalized render failed:', (err as Error).message);
+      reel.status = 'failed';
+      reel.error = (err as Error).message;
+    }
+
+    const live = loadManifest();
+    const liveEntry = live[entryKey];
+    if (liveEntry) {
+      const idx = liveEntry.reels.findIndex((r) => r.id === reel.id);
+      if (idx >= 0) liveEntry.reels[idx] = reel;
+      else liveEntry.reels.unshift(reel);
+      persistManifest(live);
+    }
+  })();
+
+  return { reelId: reel.id, sectionsUsed: picked.length, totalSec };
+}
+
 // ------------------------------------------------------------------ public API
 
 export function registerVideoFile(source: string, videoPath: string): void {
@@ -732,7 +993,7 @@ export interface GenerateReelsOptions {
  * 2. Writes full manifest with status "processing" and generates .srt caption files.
  * 3. Asynchronously renders each MP4 with FFmpeg, updating each reel to "ready" upon finish.
  */
-export async function generateReelsForSource(
+async function runReelGeneration(
   source: string,
   options: GenerateReelsOptions = {}
 ): Promise<number> {
@@ -778,10 +1039,19 @@ export async function generateReelsForSource(
     sections = constrained.length > 0 ? constrained : buildEvenSections(durationSec || 60, targetDuration);
     console.log(`[reels] Stage 2: enforced into ${sections.length} 30-60s sections for "${source}"`);
   } else {
-    // Fallback: heuristic sentence-boundary segmentation
+    // Fallback: heuristic sentence-boundary segmentation, then run the same
+    // Stage 2 constraint enforcement (merge/split) so heuristic output also
+    // respects the 30–60s window.
     console.log(`[reels] LLM segmentation unavailable, using heuristic fallback for "${source}"`);
-    sections = heuristicSegmentation(rawDocs, targetDuration, 30, 60)
+    const heuristic = heuristicSegmentation(rawDocs, targetDuration, 30, 60)
       ?? buildEvenSections(durationSec || 60, targetDuration);
+    const heuristicTopics = heuristic.map((s, i) => ({
+      title: fallbackTitle(s.text, i),
+      startSec: s.start,
+      endSec: s.end,
+    }));
+    const constrained = enforceWindowConstraints(heuristicTopics, allCues, 30, 60);
+    sections = constrained.length > 0 ? constrained : heuristic;
     console.log(`[reels] Heuristic: ${sections.length} sections for "${source}"`);
   }
 
@@ -803,9 +1073,11 @@ export async function generateReelsForSource(
       writeSrt(srtPath, cues, sec.start);
     }
 
-    // Use LLM-chosen topic title if available (from Stage 1), else let generateReelMeta infer
+    // Title from Stage 1 if available; deterministic fallback otherwise so the
+    // manifest can be persisted IMMEDIATELY (hook titles visible in the feed
+    // without waiting for the per-section LLM calls).
     const llmTitle = (sec as SectionWindow & { llmTitle?: string }).llmTitle;
-    const { title, takeaways, summary } = await generateReelMeta(sec.text, source, i, llmTitle);
+    const fallback = fallbackTakeaways(sec.text);
 
     reels.push({
       id: `${safe}#reel_${String(i + 1).padStart(3, '0')}`,
@@ -816,13 +1088,13 @@ export async function generateReelsForSource(
       startSec: sec.start,
       endSec: sec.end,
       durationSec: sec.duration,
-      title,
+      title: (llmTitle && llmTitle.trim()) || fallbackTitle(sec.text, i),
       video: `/reels/${safe}/${fileBase}.mp4`,
       fileUrl: `/reels/${safe}/${fileBase}.mp4`,
       captions: `/reels/${safe}/${srtFileName}`,
       transcript: sec.text,
-      takeaways,
-      summary,
+      takeaways: fallback,
+      summary: fallback[0] || `Key highlights from ${Math.round(sec.duration)}s of the lecture.`,
       status: 'processing',
       cues: sec.cues,
       generatedAt: new Date().toISOString(),
@@ -830,14 +1102,40 @@ export async function generateReelsForSource(
   }
 
   // Step 2: Persist immediate manifest so the frontend can read all sections right away!
+  // Preserve any personalized ("For You") reels created against a previous
+  // section set — they carry their own timestamp map.
+  const preservedPersonalized = (manifest[source]?.reels ?? []).filter((r) => r.personalized);
   manifest[source] = {
     videoPath,
     durationSec,
     status: 'processing',
     generatedAt: new Date().toISOString(),
-    reels,
+    reels: [...preservedPersonalized, ...reels],
   };
   persistManifest(manifest);
+
+  // Step 2b: Enrich takeaways & summary via LLM + RAG, persisting the manifest
+  // after every section so the feed fills in progressively (and a crash/restart
+  // mid-loop never loses already-generated metadata).
+  for (let i = 0; i < sections.length; i += 1) {
+    const sec = sections[i];
+    const llmTitle = (sec as SectionWindow & { llmTitle?: string }).llmTitle;
+    try {
+      const meta = await generateReelMeta(sec.text, source, i, llmTitle);
+      reels[i].title = meta.title;
+      reels[i].takeaways = meta.takeaways;
+      reels[i].summary = meta.summary;
+    } catch (err) {
+      console.error(`[reels] metadata enrichment failed for clip ${i + 1}:`, (err as Error).message);
+    }
+    const liveManifest = loadManifest();
+    if (liveManifest[source]) {
+      // Merge: keep any personalized reels added concurrently, don't clobber them
+      const livePreserved = liveManifest[source].reels.filter((r) => r.personalized);
+      liveManifest[source].reels = [...livePreserved, ...reels];
+      persistManifest(liveManifest);
+    }
+  }
 
   // Step 3: Background FFmpeg rendering loop
   (async () => {
@@ -859,10 +1157,12 @@ export async function generateReelsForSource(
         allSucceeded = false;
       }
 
-      // Update live manifest after each clip finishes
+      // Update live manifest after each clip finishes (merge, don't clobber
+      // personalized reels added concurrently)
       const liveManifest = loadManifest();
       if (liveManifest[source]) {
-        liveManifest[source].reels = reels;
+        const livePreserved = liveManifest[source].reels.filter((r) => r.personalized);
+        liveManifest[source].reels = [...livePreserved, ...reels];
         persistManifest(liveManifest);
       }
     }
@@ -880,12 +1180,44 @@ export async function generateReelsForSource(
   return reels.length;
 }
 
+/**
+ * Crash-safe wrapper around the generation pipeline: any unexpected failure
+ * is recorded in the manifest (status: "failed") so the frontend always has
+ * an up-to-date status to poll — never a stuck "idle" entry.
+ */
+export async function generateReelsForSource(
+  source: string,
+  options: GenerateReelsOptions = {}
+): Promise<number> {
+  try {
+    return await runReelGeneration(source, options);
+  } catch (err) {
+    console.error(`[reels] generation pipeline failed for "${source}":`, (err as Error).message);
+    try {
+      const manifest = loadManifest();
+      if (manifest[source]) {
+        manifest[source].status = 'failed';
+        manifest[source].error = (err as Error).message;
+        persistManifest(manifest);
+      }
+    } catch { /* best-effort status update */ }
+    throw err;
+  }
+}
+
 export function startReelGeneration(source: string, options: GenerateReelsOptions = {}): boolean {
-  const manifest = loadManifest();
-  if (manifest[source]?.status === 'processing') return false;
-  void generateReelsForSource(source, options).catch((err: Error) => {
-    console.error(`[reels] generation failed for "${source}":`, err.message);
-  });
+  // In-flight tracking is process-local (not the persisted manifest status) so
+  // a stale "processing" entry from a crashed/restarted server never blocks
+  // regeneration.
+  if (activeGenerations.has(safeName(source))) return false;
+  activeGenerations.add(safeName(source));
+  void generateReelsForSource(source, options)
+    .catch((err: Error) => {
+      console.error(`[reels] generation failed for "${source}":`, err.message);
+    })
+    .finally(() => {
+      activeGenerations.delete(safeName(source));
+    });
   return true;
 }
 

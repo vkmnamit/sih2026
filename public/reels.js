@@ -26,6 +26,9 @@
   const reelsFeedWrap = document.getElementById('reelsFeedWrap');
   const reelsFeed = document.getElementById('reelsFeed');
   const reelsFeedCount = document.getElementById('reelsFeedCount');
+  const foryouChips = document.getElementById('foryouChips');
+  const foryouInput = document.getElementById('foryouInput');
+  const foryouBtn = document.getElementById('foryouBtn');
 
   const viewport = document.getElementById('viewport');
   const viewportEmpty = document.getElementById('viewportEmpty');
@@ -86,6 +89,17 @@
   let selectedUploadFile = null;
   let knownReelIds = new Set();
   let feedSource = '';
+  const selectedInterests = new Set();
+
+  /** Personalized "For You" reels first, then chronological order. */
+  function sortReels(list) {
+    return list.slice().sort((a, b) => {
+      const pa = a.personalized ? 0 : 1;
+      const pb = b.personalized ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return (a.start ?? 0) - (b.start ?? 0);
+    });
+  }
 
   // ---------- Helpers ----------
   function formatTime(sec) {
@@ -277,7 +291,7 @@
       const res = await fetch(`/api/reels?source=${encodeURIComponent(source)}`);
       const data = await res.json();
 
-      reelList = data.reels || [];
+      reelList = sortReels(data.reels || []);
 
       if (data.status === 'processing' || data.status === 'generating') {
         const readyCount = reelList.filter((r) => r.status === 'ready').length;
@@ -349,7 +363,7 @@
         const res = await fetch(`/api/reels?source=${encodeURIComponent(source)}`);
         const data = await res.json();
         const prevList = reelList;
-        reelList = data.reels || [];
+        reelList = sortReels(data.reels || []);
 
         if (reelList.length > 0) {
           viewportEmpty.style.display = 'none';
@@ -421,6 +435,7 @@
 
     const readyCount = reelList.filter((r) => r.status === 'ready' || !r.status).length;
     reelsFeedCount.textContent = `${readyCount}/${reelList.length} ready`;
+    updateInterestChips();
 
     const scrollTop = reelsFeed.scrollTop;
     reelsFeed.innerHTML = '';
@@ -442,14 +457,19 @@
         : (reel.summary || reel.transcript || '');
 
       const card = document.createElement('div');
-      card.className = `feed-card${idx === currentIndex ? ' active' : ''}${isNew ? ' slide-in' : ''}`;
+      const isForyou = !!reel.personalized;
+      card.className = `feed-card${isForyou ? ' foryou' : ''}${idx === currentIndex ? ' active' : ''}${isNew ? ' slide-in' : ''}`;
       card.dataset.reelId = id;
+      const topicsBadge = (reel.segments && reel.segments.length > 1)
+        ? `<span class="feed-badge">${reel.segments.length} topics</span>`
+        : '';
       card.innerHTML = `
-        <div class="feed-num">${idx + 1}</div>
+        <div class="feed-num">${isForyou ? '✨' : idx + 1}</div>
         <div class="feed-body">
           <div class="feed-top">
             <span class="feed-title">${escapeHtml(reel.title || `Clip #${idx + 1}`)}</span>
             <span class="feed-badge">${dur}s</span>
+            ${topicsBadge}
             ${statusBadge}
           </div>
           ${takeaway ? `<div class="feed-takeaway">💡 ${escapeHtml(takeaway)}</div>` : ''}
@@ -483,6 +503,59 @@
     Array.from(reelsFeed.children).forEach((el, i) => {
       el.classList.toggle('active', i === currentIndex);
     });
+  }
+
+  // ---------- ✨ For You (interest-based personalized reel) ----------
+  function updateInterestChips() {
+    if (!foryouChips) return;
+    foryouChips.innerHTML = '';
+    const titles = reelList
+      .filter((r) => !r.personalized && r.title)
+      .map((r) => r.title);
+    const unique = [...new Set(titles)].slice(0, 8);
+    unique.forEach((t) => {
+      const chip = document.createElement('span');
+      chip.className = `foryou-chip${selectedInterests.has(t) ? ' selected' : ''}`;
+      chip.textContent = t;
+      chip.title = t;
+      chip.addEventListener('click', () => {
+        if (selectedInterests.has(t)) selectedInterests.delete(t);
+        else selectedInterests.add(t);
+        chip.classList.toggle('selected');
+      });
+      foryouChips.appendChild(chip);
+    });
+  }
+
+  async function createPersonalizedReel() {
+    const interests = [...selectedInterests];
+    const custom = (foryouInput?.value || '').trim();
+    if (custom && !interests.includes(custom)) interests.push(custom);
+    if (interests.length === 0) {
+      setStatus('Pick at least one topic or type an interest ✨', 'generating');
+      return;
+    }
+    if (!currentSource) return;
+
+    if (foryouBtn) foryouBtn.disabled = true;
+    setStatus('Stitching your personalized reel…', 'generating');
+    try {
+      const res = await fetch('/api/reels/personalize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: currentSource, interests }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Personalization failed');
+      setStatus(`✨ For You reel queued — ${data.sectionsUsed} topics · ${Math.round(data.totalSec)}s`, 'generating');
+      if (foryouInput) foryouInput.value = '';
+      await fetchReelsForSource(currentSource);
+      startPolling(currentSource);
+    } catch (err) {
+      setStatus(`Failed: ${err.message}`, 'error');
+    } finally {
+      if (foryouBtn) foryouBtn.disabled = false;
+    }
   }
 
   // ---------- Reel Playback & Presentation ----------
@@ -711,6 +784,21 @@
     a.click();
     document.body.removeChild(a);
   });
+
+  if (foryouBtn) {
+    foryouBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      createPersonalizedReel();
+    });
+  }
+  if (foryouInput) {
+    foryouInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        createPersonalizedReel();
+      }
+    });
+  }
 
   summaryBtn.addEventListener('click', (e) => {
     e.stopPropagation();
