@@ -11,8 +11,8 @@ import { config, ALLOWED_MEDIA_EXTENSIONS, ALLOWED_PDF_EXTENSIONS } from './conf
 
 const app = createApp();
 
-app.listen(config.port, () => {
-  console.log(`[eklavya-backend] listening on http://localhost:${config.port}`);
+app.listen(config.port, '0.0.0.0', () => {
+  console.log(`[eklavya-backend] listening on http://0.0.0.0:${config.port}`);
   console.log(`  POST /api/ingest/pdf   (multipart field "file": ${ALLOWED_PDF_EXTENSIONS.join(', ')})`);
   console.log(`  POST /api/ingest/video (multipart field "file": ${ALLOWED_MEDIA_EXTENSIONS.join(', ')})`);
   console.log(`  POST /api/ingest       (auto-detect PDF vs video/audio)`);
