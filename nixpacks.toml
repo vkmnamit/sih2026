@@ -1,8 +1,12 @@
 [phases.setup]
-nixPkgs = ['nodejs_18', 'npm-9_x']
+nixPkgs = ['nodejs_20', 'npm-10_x']
 
 [phases.install]
-cmds = ['npm ci --prefer-offline --no-audit']
+cmds = [
+  'npm cache clean --force || true',
+  'rm -rf node_modules/.cache || true',
+  'npm ci --prefer-offline --no-audit --cache /tmp/npm-cache'
+]
 
 [phases.build]
 cmds = ['npm run build']
