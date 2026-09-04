@@ -20,7 +20,18 @@ export interface ChatMessage {
   content: string;
 }
 
-/** Minimal chat completion — returns the assistant message text. */
+const FREE_MODELS_FALLBACK = [
+  config.openRouterModel,
+  'openrouter/free',
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'google/gemini-2.0-flash-exp:free',
+  'qwen/qwen-2.5-72b-instruct:free',
+  'mistralai/mistral-small-24b-instruct-2501:free',
+  'meta-llama/llama-3.2-3b-instruct:free',
+  'meta-llama/llama-3.1-8b-instruct:free',
+];
+
+/** Minimal chat completion — returns the assistant message text with model fallback. */
 export async function chatComplete(
   messages: ChatMessage[],
   { temperature = 0.3, maxTokens = 1024 }: { temperature?: number; maxTokens?: number } = {}
@@ -29,55 +40,47 @@ export async function chatComplete(
     throw new Error('OPENROUTER_API_KEY is not set. Add it to the .env file.');
   }
 
-  const call = (): Promise<Response> =>
-    fetch(`${config.openRouterBaseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.openRouterApiKey}`,
-        // OpenRouter attribution headers (recommended for app identification)
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'Eklavya',
-      },
-      body: JSON.stringify({
-        model: config.openRouterModel,
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-      }),
-      // Hard timeout — a hung OpenRouter request must never stall a
-      // background pipeline (e.g. reel metadata generation) forever.
-      signal: AbortSignal.timeout(120_000),
-    });
+  const uniqueModels = [...new Set(FREE_MODELS_FALLBACK.filter(Boolean))];
+  let lastError = '';
 
-  // Free-tier models are often transiently rate-limited (429) or return an
-  // empty completion — retry once after a short backoff.
-  let res = await call();
-  if (res.status === 429) {
-    await new Promise((r) => setTimeout(r, 2500));
-    res = await call();
-  }
+  for (const modelToTry of uniqueModels) {
+    try {
+      const res = await fetch(`${config.openRouterBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.openRouterApiKey}`,
+          'HTTP-Referer': 'https://sih-2026-eklavya.vercel.app',
+          'X-Title': 'EkLavya AI Tutor',
+        },
+        body: JSON.stringify({
+          model: modelToTry,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+        }),
+        signal: AbortSignal.timeout(30_000),
+      });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`OpenRouter error ${res.status}: ${body.slice(0, 300)}`);
-  }
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => '');
+        lastError = `Model ${modelToTry} returned HTTP ${res.status}: ${errorText.slice(0, 150)}`;
+        console.warn(`[llm] ${lastError}, attempting next fallback model...`);
+        continue;
+      }
 
-  const data = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  let text = data.choices?.[0]?.message?.content?.trim() ?? '';
-  if (!text) {
-    await new Promise((r) => setTimeout(r, 2500));
-    res = await call();
-    if (res.ok) {
-      const retried = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-      text = retried.choices?.[0]?.message?.content?.trim() ?? '';
-    } else {
-      const body = await res.text().catch(() => '');
-      throw new Error(`OpenRouter error ${res.status}: ${body.slice(0, 300)}`);
+      const data = (await res.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const text = data.choices?.[0]?.message?.content?.trim();
+      if (text && text.length > 0) {
+        return text;
+      }
+    } catch (err) {
+      lastError = (err as Error).message;
+      console.warn(`[llm] Model ${modelToTry} fetch error: ${lastError}`);
     }
   }
-  if (!text) throw new Error('OpenRouter returned an empty completion');
-  return text;
+
+  throw new Error(`All LLM models failed. Last error: ${lastError}`);
 }

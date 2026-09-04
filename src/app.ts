@@ -36,6 +36,46 @@ export function createApp(): express.Express {
   app.use('/reels', express.static(config.reelsDir, { acceptRanges: true }));
   app.use('/uploads', express.static(config.uploadDir, { acceptRanges: true }));
 
+  // Root endpoint — rich status update for public and developer visibility
+  app.get('/', async (_req, res) => {
+    let vectorStats = { documents: 0, sources: 0, sourceNames: [] as string[] };
+    try {
+      const { stats } = await import('./services/vector-store.service.js');
+      vectorStats = stats();
+    } catch {
+      // ignore
+    }
+
+    res.json({
+      status: 'online',
+      service: 'EkLavya AI Backend — Smart Education Ecosystem',
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      endpoints: {
+        root: 'GET /',
+        health: 'GET /health',
+        ragAsk: 'POST /api/ask',
+        studyCards: 'GET /api/cards',
+        reelsFeed: 'GET /api/reels',
+        fileIngest: 'POST /api/ingest',
+        authLogin: 'POST /api/auth/login',
+        authSignup: 'POST /api/auth/signup',
+      },
+      knowledgeBase: {
+        indexedDocuments: vectorStats.documents,
+        sourcesCount: vectorStats.sources,
+        sources: vectorStats.sourceNames,
+      },
+      aiModels: {
+        embeddings: config.embeddingModel,
+        llm: config.openRouterModel,
+        speechToText: 'Whisper.cpp (16kHz PCM)',
+        ocr: 'Tesseract.js + MuPDF',
+      },
+    });
+  });
+
   app.get('/health', (_req, res) => {
     res.json({ ok: true, service: 'eklavya-backend', time: new Date().toISOString() });
   });
