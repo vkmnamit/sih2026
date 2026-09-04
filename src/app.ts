@@ -6,11 +6,30 @@ import express from 'express';
 import path from 'node:path';
 import apiRoutes from './routes/index.js';
 import { config } from './config/index.js';
+import cors from 'cors';
+
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js';
 
 export function createApp(): express.Express {
   const app = express();
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://sih-2026-eklavya.vercel.app',
+    process.env.FRONTEND_URL,
+  ].filter(Boolean) as string[];
 
+  app.use(cors({
+    origin: (origin, callback) => {
+      // allow requests with no origin (like mobile apps, curl, or same-origin)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Permissive for hackathon demo
+    },
+    credentials: true,
+  }));
   app.use(express.json({ limit: '1mb' }));
 
   // Test frontend (public/index.html) — served by the backend so the page
