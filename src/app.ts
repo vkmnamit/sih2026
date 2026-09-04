@@ -32,11 +32,6 @@ export function createApp(): express.Express {
   }));
   app.use(express.json({ limit: '1mb' }));
 
-  // Test frontend (public/index.html) — served by the backend so the page
-  // is same-origin with /api/* and needs no CORS setup.
-  // Resolved from this file's location (src/ or dist/) → project root/public.
-  app.use(express.static(path.resolve(import.meta.dirname, '..', 'public')));
-
   // Serve rendered MP4 reels and uploaded media
   app.use('/reels', express.static(config.reelsDir, { acceptRanges: true }));
   app.use('/uploads', express.static(config.uploadDir, { acceptRanges: true }));

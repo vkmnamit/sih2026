@@ -81,6 +81,33 @@ export async function ask(
   const reel = (videoHit ? findReelForTimestamp(videoHit.doc.source, videoHit.doc.meta.startSec as number) : null) ?? undefined;
 
   if (hits.length === 0) {
+    // If no indexed content, fallback to general Socratic AI tutoring instead of hard failure
+    if (hasLlmKey()) {
+      try {
+        const generalPrompt = [
+          'You are Eklavya, an expert AI tutor for computer science and engineering students.',
+          'Explain concepts clearly and Socratically with examples, analogies, and practice questions.',
+          'Format your answers nicely with markdown, code snippets if relevant, and key takeaways.',
+        ].join(' ');
+
+        const answer = await chatComplete([
+          { role: 'system', content: generalPrompt },
+          { role: 'user', content: trimmed },
+        ]);
+
+        return {
+          ok: true,
+          question: trimmed,
+          grounded: false,
+          model: config.openRouterModel,
+          answer: answer + '\n\n*(💡 Tip: Upload course materials or lecture PDFs to get answers grounded directly in your class notes!)*',
+          sources: [],
+        };
+      } catch (err) {
+        console.error('[rag] General LLM fallback failed:', err);
+      }
+    }
+
     return {
       ok: true,
       question: trimmed,
@@ -88,7 +115,7 @@ export async function ask(
       model: 'none',
       answer: source
         ? `No indexed content found for "${source}". Re-upload the file, or switch back to "All materials".`
-        : 'No indexed content found yet. Upload a PDF or video first, then ask again.',
+        : 'Hello! I am your AI Tutor. You can ask me any technical question, or upload study materials via the Teacher portal to get answers grounded in your specific notes!',
       sources: [],
     };
   }
