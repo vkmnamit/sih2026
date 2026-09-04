@@ -88,14 +88,13 @@ export const config = {
   openRouterModel: process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
 
   // ---- Supabase (auth + optional data layer) ----
-  // Reads BOTH the hyphenated names used in .env (supabase-project-id) and
-  // the underscore aliases (supabase_project_id); the hyphenated ones win.
+  // Reads hyphenated (.env), underscore, and uppercase standard variants.
   supabase: {
-    enabled: !!(process.env['supabase-project-id'] || process.env.supabase_project_id) &&
-             !!(process.env['supabase-service-key'] || process.env.supabase_service_key),
-    url: process.env['supabase-project-id'] || process.env.supabase_project_id || '',
-    anonKey: process.env['supabase-anon-key'] || process.env.supabase_anon_key || '',
-    serviceRoleKey: process.env['supabase-service-key'] || process.env.supabase_service_key || '',
+    enabled: !!(process.env['supabase-project-id'] || process.env.supabase_project_id || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) &&
+             !!(process.env['supabase-service-key'] || process.env.supabase_service_key || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY),
+    url: process.env['supabase-project-id'] || process.env.supabase_project_id || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    anonKey: process.env['supabase-anon-key'] || process.env.supabase_anon_key || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    serviceRoleKey: process.env['supabase-service-key'] || process.env.supabase_service_key || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '',
     tables: {
       cards: process.env.SUPABASE_TABLE_CARDS || 'cards',
       documents: process.env.SUPABASE_TABLE_DOCUMENTS || 'documents',
@@ -104,7 +103,7 @@ export const config = {
   },
 
   // ---- Server ----
-  port: Number(process.env.PORT) || 3000,
+  port: Number(process.env.PORT) || 8080,
   maxUploadMb: Number(process.env.MAX_UPLOAD_MB) || 500,
 } as const;
 
